@@ -11,13 +11,13 @@ class Result:
     source: str
     title: str
     url: str
-    snippet: str | None = None        # web/discourse one-line preview
-    abstract: str | None = None       # academic full abstract
+    snippet: str | None = None  # web/discourse one-line preview
+    abstract: str | None = None  # academic full abstract
     authors: list[str] | None = None  # academic
-    year: int | None = None           # academic
-    points: int | None = None         # HN score / Reddit upvotes
-    comments: int | None = None       # discourse comment count
-    posted_at: str | None = None      # ISO 8601 date if known
+    year: int | None = None  # academic
+    points: int | None = None  # HN score / Reddit upvotes
+    comments: int | None = None  # discourse comment count
+    posted_at: str | None = None  # ISO 8601 date if known
     extra: dict[str, Any] = field(default_factory=dict)  # per-source extras (doi, etc.)
 
 
