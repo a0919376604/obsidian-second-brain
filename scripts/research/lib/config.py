@@ -1,39 +1,73 @@
-"""Loads research-toolkit credentials and model defaults from ~/.config/obsidian-second-brain/.env"""
+"""Reads ~/.config/obsidian-second-brain/research.toml.
 
-from pathlib import Path
-from dotenv import load_dotenv
+The file is optional. Defaults below are used when missing or partial.
+No API keys live here — this is purely polite-pool email + tunables.
+"""
+
+from __future__ import annotations
+
 import os
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
 
-CONFIG_DIR = Path.home() / ".config" / "obsidian-second-brain"
-ENV_PATH = CONFIG_DIR / ".env"
-
-load_dotenv(ENV_PATH)
-
-
-def get_required(name: str) -> str:
-    val = os.environ.get(name, "").strip()
-    if not val:
-        raise SystemExit(
-            f"\n{name} not configured.\n"
-            f"Add it to {ENV_PATH}\n"
-            f"Or run install.sh from the obsidian-second-brain repo to set it up.\n"
-        )
-    return val
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
-def get_optional(name: str, default: str = "") -> str:
-    return os.environ.get(name, default).strip() or default
+_DEFAULT_SEARXNG = [
+    "https://searx.be",
+    "https://search.brave4u.com",
+    "https://priv.au",
+]
 
 
-XAI_API_KEY = lambda: get_required("XAI_API_KEY")
-PERPLEXITY_API_KEY = lambda: get_required("PERPLEXITY_API_KEY")
-GEMINI_API_KEY = lambda: get_required("GEMINI_API_KEY")
-YOUTUBE_API_KEY = lambda: get_optional("YOUTUBE_API_KEY", "")
+@dataclass(frozen=True)
+class Config:
+    contact_email: str | None = None
+    searxng_instances: list[str] = field(default_factory=lambda: list(_DEFAULT_SEARXNG))
+    cache_ttl_hours: int = 24
+    arxiv_seconds: float = 3.0
+    reddit_seconds: float = 0.5
+    semantic_scholar_seconds: float = 3.0
 
-GROK_MODEL = get_optional("GROK_MODEL", "grok-4")
-PERPLEXITY_RESEARCH_MODEL = get_optional("PERPLEXITY_RESEARCH_MODEL", "sonar-pro")
-PERPLEXITY_DEEP_MODEL = get_optional("PERPLEXITY_DEEP_MODEL", "sonar-deep-research")
-NOTEBOOKLM_MODEL = get_optional("NOTEBOOKLM_MODEL", "gemini-2.5-flash")
 
-VAULT_PATH = Path(get_required("OBSIDIAN_VAULT_PATH")).expanduser()
-USAGE_LOG = Path.home() / ".research-toolkit" / "usage.log"
+_CACHE: Config | None = None
+
+
+def _config_path() -> Path:
+    return Path(os.path.expanduser("~/.config/obsidian-second-brain/research.toml"))
+
+
+def load() -> Config:
+    global _CACHE
+    if _CACHE is not None:
+        return _CACHE
+
+    p = _config_path()
+    if not p.exists():
+        _CACHE = Config()
+        return _CACHE
+
+    raw = tomllib.loads(p.read_text())
+    cfg = Config(
+        contact_email=raw.get("contact_email"),
+        searxng_instances=raw.get("searxng", {}).get("instances", list(_DEFAULT_SEARXNG)),
+        cache_ttl_hours=int(raw.get("cache", {}).get("ttl_hours", 24)),
+        arxiv_seconds=float(raw.get("rate_limits", {}).get("arxiv_seconds", 3.0)),
+        reddit_seconds=float(raw.get("rate_limits", {}).get("reddit_seconds", 0.5)),
+        semantic_scholar_seconds=float(
+            raw.get("rate_limits", {}).get("semantic_scholar_seconds", 3.0)
+        ),
+    )
+    _CACHE = cfg
+    return cfg
+
+
+def get_contact_email() -> str | None:
+    return load().contact_email
+
+
+__all__ = ["Config", "load", "get_contact_email"]
