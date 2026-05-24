@@ -284,4 +284,4 @@ When auditing an existing note (Phase 2 work or one-off cleanup), verify:
 
 ## Migration Note
 
-This rule was established 2026-04-25 and shipped as part of obsidian-second-brain v0.5.0 (Research Toolkit). All 5 research commands (`/x-read`, `/x-pulse`, `/research`, `/research-deep`, `/youtube`) follow it from day one. The 26 existing `/obsidian-*` commands were updated in v0.6.0 (Phase 2) to explicitly reference this document. Notes written before that may not yet meet the standard — `/obsidian-health` flags them.
+This rule was established 2026-04-25 and shipped as part of obsidian-second-brain v0.5.0 (Research Toolkit). All 7 research commands (`/research`, `/research-deep`, `/discourse-pulse`, `/thread-read`, `/youtube`, `/idea-discovery`, `/vault-deep-synthesis`) follow it from day one. The 26 existing `/obsidian-*` commands were updated in v0.6.0 (Phase 2) to explicitly reference this document. Notes written before that may not yet meet the standard - `/obsidian-health` flags them.

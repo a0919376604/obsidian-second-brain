@@ -11,9 +11,11 @@ description: >
   tracking deals, or maintaining any vault structure. Also triggers when the user
   wants to bootstrap a new vault from scratch, run a vault health check, or drop
   a _CLAUDE.md into their vault so all Claude surfaces share the same operating rules.
-  Includes a research toolkit (6 commands: /x-read, /x-pulse, /research, /research-deep,
-  /notebooklm, /youtube) for AI-powered research via Grok, Perplexity, NotebookLM, and YouTube — findings save
-  to the vault automatically following the AI-first vault rule. Use proactively whenever
+  Includes a research toolkit (7 commands: /research, /research-deep, /discourse-pulse,
+  /thread-read, /youtube, /idea-discovery, /vault-deep-synthesis) that uses only free,
+  key-less sources (arXiv, Semantic Scholar, DuckDuckGo, Wikipedia, HackerNews, Reddit,
+  and others) with synthesis performed by Claude. Findings save to the vault automatically
+  following the AI-first vault rule. Use proactively whenever
   the conversation produces information worth preserving (decisions, people met, projects
   started, tasks completed, lessons learned, research findings).
 ---
@@ -794,52 +796,52 @@ Can also be triggered automatically by `/obsidian-graduate`, `/obsidian-health` 
 
 ## Research Commands
 
-Five commands that pull external knowledge into the vault — X posts, X discourse, web research with citations, and YouTube videos. All output AI-first notes per the vault's Section 0 rule (preamble, rich frontmatter, recency markers, mandatory wikilinks, sources verbatim).
+Seven commands that pull external knowledge into the vault from free, key-less sources - HN/Reddit/Lobsters/dev.to discourse, arXiv/Semantic Scholar/OpenAlex/CrossRef papers, DuckDuckGo + Wikipedia, YouTube transcripts. All output AI-first notes per the vault's Section 0 rule (preamble, rich frontmatter, recency markers, mandatory wikilinks, sources verbatim). Synthesis is performed by the calling Claude session - no external LLM API.
 
-**Setup:** API keys live at `~/.config/obsidian-second-brain/.env`. Run `install.sh` and answer "y" to the research toolkit prompt, or copy `.env.example` manually. xAI Grok and Perplexity keys are required; YouTube key is optional (transcripts work without it).
+**Setup:** zero API keys required. Optional: set `contact_email` in `~/.config/obsidian-second-brain/research.toml` so polite-pool source APIs (arXiv, CrossRef, OpenAlex) give you better rate limits.
 
 **Stack:** Python 3.10+ with `uv`. Install deps via `uv sync` from the repo root.
 
 ---
 
-### `/x-read [url]`
+### `/thread-read [url]`
 
-**Deep-read an X post** via Grok + Live Search. Verbatim post + thread + TL;DR + key claims + reply sentiment + voices to watch.
+**Deep-read a single HN or Reddit thread.** Verbatim post + comment tree + TL;DR + key claims + sentiment + voices to watch.
 
 Steps:
-1. Validate the URL contains `x.com/` or `twitter.com/`
-2. Run `uv run -m scripts.research.x_read "<url>"` from the repo root
+1. Validate the URL points at `news.ycombinator.com/item?id=...` or a Reddit submission URL
+2. Run `uv run -m scripts.research.thread_read "<url>"` from the repo root
 3. Show the structured analysis verbatim to the user
-4. **Default save: chat only.** If the user asks "save this", write an AI-first note to `Research/X-reads/`
+4. **Default save: chat only.** If the user asks "save this", write an AI-first note to `Research/Threads/`
 
-Plain English triggers: "read this tweet", "analyze this X post", "what's in this tweet".
+Plain English triggers: "read this HN thread", "analyze this Reddit thread", "what's in this thread".
 
 ---
 
-### `/x-pulse [topic]`
+### `/discourse-pulse [topic]`
 
-**Scan X for what's trending** in a topic. Themes (with rep posts + voices), gaps, hooks working, voice/tone, post ideas.
+**Scan HN/Reddit/Lobsters/dev.to for what's trending** in a topic. Themes (with rep posts + voices), gaps, hooks working, voice/tone, post ideas.
 
 Steps:
 1. Resolve the topic (multi-word fine)
-2. Run `uv run -m scripts.research.x_pulse "<topic>"`
+2. Run `uv run -m scripts.research.discourse_pulse "<topic>"`
 3. Show the pulse output verbatim
-4. **Default save: auto-saves** to `Research/X-pulse/YYYY-MM-DD — <slug>.md` (AI-first format)
+4. **Default save: auto-saves** to `Research/Discourse-pulse/YYYY-MM-DD - <slug>.md` (AI-first format)
 5. Append one-line entry to `log.md`
 
-Plain English: "what's hot on X about AI", "X pulse on vibe coding", "what should I post today on AI automation".
+Plain English: "what's hot on HN about AI", "discourse pulse on vibe coding", "what should I post today on AI automation".
 
 ---
 
-### `/research [topic]`
+### `/research [topic] [--academic]`
 
-**Web research with citations** via Perplexity Sonar Pro. Deep dossier: summary, key facts (with recency markers), timeline, key players, contrarian views, further reading, open questions.
+**Multi-source web research with citations.** Hits arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HN, Reddit, Lobsters, dev.to in parallel. Calling Claude synthesizes a deep dossier: summary, key facts (with recency markers), timeline, key players, contrarian views, further reading, open questions.
 
 Steps:
 1. Resolve the topic
-2. Run `uv run -m scripts.research.research "<topic>"`
+2. Run `uv run -m scripts.research.research "<topic>"` (add `--academic` to restrict to arXiv + Semantic Scholar + OpenAlex + CrossRef)
 3. Show the dossier verbatim, including citations
-4. **Default save: auto-saves** to `Research/Web/YYYY-MM-DD — <slug>.md`
+4. **Default save: auto-saves** to `Research/Web/YYYY-MM-DD - <slug>.md`
 5. All citations stored in frontmatter for later Dataview queries
 
 Plain English: "research X", "look up X", "find me info on X". Note: "do deep research" routes to `/research-deep` instead.
@@ -851,76 +853,80 @@ Plain English: "research X", "look up X", "find me info on X". Note: "do deep re
 **Vault-first deep research with cross-vault propagation.** The chain-everything command.
 
 Steps (4 phases):
-1. **Vault scan** — find existing notes mentioning the topic (the baseline)
-2. **Gap analysis** — Perplexity sonar-pro identifies what's missing/stale, emits 3-5 targeted queries
-3. **Gap-fill** — runs each query via Perplexity (web) or Grok+Live Search (X)
-4. **Synthesis** — Perplexity sonar-deep-research produces a delta report (what's new, what's confirmed, contradictions, recommended vault updates, open questions)
+1. **Vault scan** - find existing notes mentioning the topic (the baseline)
+2. **Gap analysis** - Claude identifies what's missing/stale in the vault, emits 3-5 targeted queries
+3. **Gap-fill** - runs each query across the free-source set (arXiv/Semantic Scholar/OpenAlex/CrossRef + DuckDuckGo/Wikipedia + HN/Reddit/Lobsters/dev.to)
+4. **Synthesis** - Claude produces a delta report (what's new, what's confirmed, contradictions, recommended vault updates, open questions)
 
 Then:
-- Writes synthesis to `Research/Deep/YYYY-MM-DD — <slug>.md`
+- Writes synthesis to `Research/Deep/YYYY-MM-DD - <slug>.md`
 - Emits a JSON propagation payload between `<<<RESEARCH_DEEP_PROPAGATION_PAYLOAD>>>` markers
 - Calling Claude reads that payload and runs `/obsidian-save`-style propagation: spawns parallel subagents to update People/Projects/Ideas/Decisions per the synthesis's "Recommended Vault Updates" bullets
 - Links new research note from today's daily note
 
-Cost: typically $0.20-$0.80 per run depending on topic depth.
+Cost: $0. All sources are free and key-less.
 
 Plain English: "do deep research on X", "research properly", "vault-aware research on X", "research and update the vault".
 
-Graceful degradation: if any phase fails partially (e.g. Grok unavailable), continues with available sources and flags the gap.
+Graceful degradation: if any source fails partially (rate-limit, network blip), continues with available sources and flags the gap.
 
 ---
 
-### `/notebooklm [topic]`
+### `/vault-deep-synthesis [topic]`
 
-**Vault-first source-grounded research.** The parallel to `/research-deep` — but grounded in your own sources instead of the open web.
+**Cross-note vault synthesis.** The parallel to `/research-deep` - but grounded in your own vault notes instead of the open web. No network, no external LLM.
 
-Steps (4 phases + manual NotebookLM step):
-1. **Vault scan** — same logic as `/research-deep` Phase 1, finds top 12 most relevant notes
-2. **Bundle** — concatenates them into a single markdown source file at `Research/NotebookLM/YYYY-MM-DD — <slug> — bundle.md` (well under NotebookLM's 500K-char/source limit)
-3. **Prompt template** — script prints a structured prompt with sections: Source summary / Confirmed claims / Contradictions / Gaps / Recommended next reads / Confidence
-4. **User does the manual NotebookLM step:** open notebooklm.google.com, create a notebook, paste the bundle as a "Pasted Text" source, optionally add PDFs/URLs/Google Docs, paste the prompt, copy the response
-5. **Save response** — user runs `uv run -m scripts.research.notebooklm --save-response --topic "<topic>" --slug "<slug>"` and pastes response via stdin
-6. **Propagation** — same `/obsidian-save` flow as `/research-deep`
+Steps:
+1. **Vault scan** - same logic as `/research-deep` Phase 1, finds top 12 most relevant notes
+2. **Read** - calling Claude reads the selected notes directly via the read-files tool
+3. **Synthesize** - produces a structured response with sections: Source summary / Confirmed claims / Contradictions / Gaps / Recommended next reads / Confidence
+4. **Save** - writes synthesis to `Research/Vault-Synthesis/YYYY-MM-DD - <slug>.md`
+5. **Propagation** - same `/obsidian-save` flow as `/research-deep`
 
-When to use `/notebooklm` over `/research-deep`:
-- `/research-deep` (Perplexity + Grok): open-web + X-discourse coverage. Cost: $0.20-0.80
-- `/notebooklm`: GROUNDED IN your own sources (vault + any PDFs/URLs you add). Cost: ~$0 (uses your free NotebookLM access)
-- Run both for high-value topics — the open-web view and the grounded view rarely contradict, and the contradictions are where the insight is
+When to use `/vault-deep-synthesis` over `/research-deep`:
+- `/research-deep`: open-web + discourse coverage from free sources
+- `/vault-deep-synthesis`: grounded in your own vault notes only - no network
+- Run both for high-value topics - the open-web view and the grounded view rarely contradict, and the contradictions are where the insight is
 
-Why a manual step: NotebookLM's API is workspace-gated beta as of 2026-01. The pasted-source workflow works for every user with a free Google account.
+Plain English: "deep synthesis on X using my vault", "vault-grounded synthesis on X", "what does my vault say about X".
 
-Plain English: "notebooklm this", "ask my notebook about X", "ground a research on X using my vault", "source-grounded research on X".
+---
+
+### `/idea-discovery [seed]`
+
+**Surface 3-5 next-direction candidates** by scanning Ideas/, Projects/ open questions, and orphan Research/ notes. Optional seed term narrows the scan.
+
+Steps:
+1. Run `uv run -m scripts.research.idea_discovery [seed]`
+2. Script returns JSON: candidate ideas with vault source paths + relevance score
+3. Calling Claude reviews and surfaces 3-5 most promising directions to the user
+4. **Default save: chat only.** If the user picks one, route to `/obsidian-graduate` to promote it into a full project.
+
+Plain English: "what should I work on next", "idea discovery", "surface promising directions from my vault".
 
 ---
 
 ### `/youtube [url]`
 
-**Extract and summarize a YouTube video.** Transcript (free, no API key) + metadata + top comments (Data API v3, optional) → summarized via Grok.
+**Extract and summarize a YouTube video.** Transcript via `youtube-transcript-api` (free, no API key). Metadata scraped directly from the page (no YouTube Data API key required). Calling Claude summarizes.
 
 Steps:
 1. Parse video ID from URL or 11-char ID
 2. Run `uv run -m scripts.research.youtube_extract "<url>"`
 3. Fetches transcript via `youtube-transcript-api`
-4. If `YOUTUBE_API_KEY` set: also fetches title, channel, view counts, top comments
-5. Sends transcript + comments to Grok for AI-first summary: TL;DR, Key Points, Notable Quotes, Themes, Comment Sentiment, Worth Following Up On
-6. **Default save: auto-saves** to `Research/YouTube/YYYY-MM-DD — <video-title-slug>.md`
+4. Scrapes title, channel, view count, published date directly from the YouTube page HTML
+5. Calling Claude synthesizes an AI-first summary: TL;DR, Key Points, Notable Quotes, Themes, Worth Following Up On
+6. **Default save: auto-saves** to `Research/YouTube/YYYY-MM-DD - <video-title-slug>.md`
 
 Plain English: "summarize this YouTube video", "extract this video", or just paste a YouTube URL with a question.
 
-If the video has no captions and no API key set, the script fails with a clear message.
+If the video has no captions, the script returns transcript_available=false; Claude should fall back to summarizing from metadata + description only.
 
 ---
 
 ### Cost tracking
 
-`/x-read`, `/x-pulse`, and `/youtube` (Grok summarize step) log usage to `~/.research-toolkit/usage.log`. View monthly totals via:
-```bash
-uv run python -c "from scripts.research.lib.usage import month_total; t,c = month_total(); print(f'\${t:.2f} across {c} calls')"
-```
-
-No usage tracking on Perplexity calls (intentional — user opted out).
-
-No hard caps. No blocking. No per-call confirmation prompts. Trust the user to monitor.
+There is no cost to track. The default install uses only free, key-less sources. Deprecated paid-API modules (Perplexity, Grok, Gemini) live under `scripts/research/_deprecated/` for fork users who want to bring them back.
 
 ---
 

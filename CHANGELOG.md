@@ -12,7 +12,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **`scripts/setup.sh` updated:** wires the new SessionStart hook (`hooks/load_vault_context.py`) in addition to the existing PostCompact background agent.
 - **Per-day operation logs:** `/obsidian-init` now creates a `Logs/` folder with per-day files (`Logs/YYYY-MM-DD.md`) instead of a monolithic `log.md`. Root `log.md` becomes a pointer file only. Cheaper to read, faster to query.
 - **`scripts/vault_stats.py`:** computes vault stats (notes by type, project/task counts by status, people by strength) and rewrites the `<!-- BEGIN STATS -->`/`<!-- END STATS -->` markers in `index.md`. Idempotent and re-runnable.
-- **`scripts/migrate_log.py`:** splits an existing monolithic `log.md` (with `## YYYY-MM-DD` section headers) into per-day files under `Logs/`. Idempotent — skips days that already exist. Replaces root `log.md` with a pointer file after migration.
+- **`scripts/migrate_log.py`:** splits an existing monolithic `log.md` (with `## YYYY-MM-DD` section headers) into per-day files under `Logs/`. Idempotent - skips days that already exist. Replaces root `log.md` with a pointer file after migration.
+- **`/idea-discovery [seed]`** - surface 3-5 next-direction candidates by scanning `Ideas/`, `Projects/` Open Questions, and orphan `Research/` notes.
+- **`--academic` flag on `/research`** - restricts to arXiv + Semantic Scholar + OpenAlex + CrossRef.
+- **New free-source clients** under `scripts/research/lib/sources/`: arxiv, semantic_scholar, openalex, crossref, duckduckgo, wikipedia, hackernews, reddit, lobsters, devto.
+- **File-based cache** at `~/.cache/obsidian-second-brain/research/` with 24h default TTL.
+- **`~/.config/obsidian-second-brain/research.toml`** for `contact_email` + SearXNG instance list + rate-limit overrides.
+
+### Changed
+
+- **Research toolkit no longer requires paid APIs.** All 7 research commands now run on free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is performed by the calling Claude session instead of an external LLM API.
+
+### Renamed
+
+- **`/x-pulse` -> `/discourse-pulse`** (HN/Reddit/Lobsters/dev.to; X.com is no longer queried).
+- **`/x-read` -> `/thread-read`** (HN/Reddit thread URLs).
+- **`/notebooklm` -> `/vault-deep-synthesis`** (Claude reads vault directly; no external LLM).
+
+### Deprecated
+
+- **`scripts/research/lib/{perplexity,grok,gemini}.py`** moved to `scripts/research/_deprecated/`. Will be removed in v2.0.
+- **`XAI_API_KEY`, `PERPLEXITY_API_KEY`, `GEMINI_API_KEY`, `YOUTUBE_API_KEY`** are no longer read by the default install. The `.env.example` keeps them commented as an escape hatch for fork users.
+
+### Removed
+
+- **`commands/x-pulse.md`, `commands/x-read.md`, `commands/notebooklm.md`** (replaced by the renamed commands above).
 
 ### Fixed
 

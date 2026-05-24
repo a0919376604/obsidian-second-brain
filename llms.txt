@@ -48,7 +48,7 @@ obsidian-board, obsidian-capture, obsidian-daily, obsidian-find, obsidian-log, o
 obsidian-adr, obsidian-challenge, obsidian-connect, obsidian-decide, obsidian-emerge, obsidian-graduate, obsidian-learn, obsidian-reconcile, obsidian-review, obsidian-synthesize.
 
 **Research (6)** — bring external sources into the vault:
-obsidian-ingest, research, research-deep, x-pulse, x-read, youtube. Powered by xAI Grok (X + Live Search), Perplexity Sonar (web with citations), and youtube-transcript-api.
+obsidian-ingest, research, research-deep, discourse-pulse, thread-read, youtube, idea-discovery, vault-deep-synthesis. Powered by free, key-less sources: arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to, and youtube-transcript-api. Synthesis by the calling Claude session.
 
 **Meta (5)** — vault setup, health, structure, tooling:
 obsidian-export, obsidian-health, obsidian-init, obsidian-visualize, create-command.
@@ -140,7 +140,7 @@ Yes. Run `bash scripts/build.sh --platform <name>` to compile the source for tha
 Yes. The skill writes to your vault as standard markdown files. Obsidian Sync, iCloud, Syncthing, and Git-based sync all work without modification.
 
 ### Do I need API keys to use this?
-No. The 27 vault commands work without any API keys. Only the 5 research commands (x-read, x-pulse, research, research-deep, youtube) require API keys for xAI Grok, Perplexity, and optionally YouTube Data API v3. Without keys, those commands degrade gracefully.
+No. The entire skill works with zero API keys. The 27 vault commands have always been pure markdown. As of v1.0, the 7 research commands (research, research-deep, discourse-pulse, thread-read, youtube, idea-discovery, vault-deep-synthesis) also use only free, key-less sources with synthesis by the calling Claude session.
 
 ### How is this different from Notion AI or Mem?
 Notion AI and Mem are closed-source SaaS products that own your data. This skill stores everything as plain markdown in your local Obsidian vault, with no vendor lock-in. The AI is on top of your data, not behind it.
@@ -152,13 +152,13 @@ The principle that vault notes are written for future-Claude to retrieve and rea
 Yes. The skill never deletes or modifies notes destructively without explicit confirmation. Existing notes are left as-is. New notes follow the AI-first rule. `/obsidian-health` flags pre-AI-first notes so you can update them on your own schedule.
 
 ### What does /research-deep do that /research doesn't?
-`/research` runs a single Perplexity query and returns a dossier. `/research-deep` scans your vault first, identifies what you already know about the topic, spawns 3-5 targeted follow-up searches to fill only the gaps, and produces a delta report (what's new, what's confirmed, contradictions to resolve). Vault-first means you stop re-researching what's already in your notes.
+`/research` hits free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to) and Claude synthesizes a dossier. `/research-deep` scans your vault first, identifies what you already know about the topic, spawns 3-5 targeted follow-up searches across the same sources to fill only the gaps, and produces a delta report (what's new, what's confirmed, contradictions to resolve). Vault-first means you stop re-researching what's already in your notes.
 
 ### What does /create-command do?
 Lets the user scaffold a new obsidian-second-brain command via interview. Zero markdown editing. A 9-phase conversation collects intent, name, category, trigger phrases, behavior steps, AI-first compliance status, and external API needs, then writes a fully-formed `commands/<name>.md` file. The new command flows automatically into all 4 platform builds on the next `bash scripts/build.sh`.
 
 ### What do the research commands cost?
-Approximate per-call costs as of 2026-04: /x-read ~$0.05, /x-pulse ~$0.13, /research ~$0.04, /research-deep ~$0.40-$0.80, /youtube ~$0.04. Costs are tracked per call in `~/.research-toolkit/usage.log`. No hard caps; user is trusted to monitor.
+Nothing. As of v1.0, the research toolkit uses only free, key-less sources. Deprecated paid-API modules (Perplexity, Grok, Gemini) live under `scripts/research/_deprecated/` for fork users who want to bring them back.
 
 ## License
 

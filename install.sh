@@ -37,43 +37,41 @@ else
   echo "Skill linked at $SKILL_LINK"
 fi
 
-# ── Research toolkit setup (optional) ──────────────────────────────
+# ── Research toolkit setup (optional, zero API keys required) ──────
 echo ""
-echo "Research toolkit (optional): /x-read, /x-pulse, /research, /research-deep, /youtube"
-echo "These commands need API keys for Grok (xAI) and Perplexity. YouTube key is optional."
+echo "Research toolkit (free, zero API keys):"
+echo "  /research, /research-deep, /discourse-pulse, /thread-read, /youtube,"
+echo "  /idea-discovery, /vault-deep-synthesis"
 echo ""
-read -r -p "Set up research toolkit now? [y/N] " setup_research
+echo "Sources: arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo,"
+echo "  Wikipedia, HackerNews, Reddit, Lobsters, dev.to."
+echo ""
+read -r -p "Install Python deps for the research toolkit now? [y/N] " setup_research
 setup_research=${setup_research:-N}
 
 if [[ "$setup_research" =~ ^[Yy]$ ]]; then
   # Verify uv is available
   if ! command -v uv >/dev/null 2>&1; then
-    echo "  ⚠️  'uv' not found. Install with: brew install uv"
-    echo "     Then re-run this installer to finish research toolkit setup."
+    echo "  'uv' not found. Install with: brew install uv"
+    echo "  Then re-run this installer to finish research toolkit setup."
   else
     echo "  Installing Python deps via uv..."
     (cd "$SKILL_DIR" && uv sync --quiet)
     echo "  Python deps ready."
   fi
 
-  # Set up config dir + .env
+  # Optional polite-pool contact email
   mkdir -p "$CONFIG_DIR"
-  if [ -f "$ENV_FILE" ]; then
-    echo "  $ENV_FILE already exists — leaving it untouched."
+  TOML_FILE="$CONFIG_DIR/research.toml"
+  if [ -f "$TOML_FILE" ]; then
+    echo "  $TOML_FILE already exists - leaving it untouched."
   else
-    cp "$SKILL_DIR/.env.example" "$ENV_FILE"
-    chmod 600 "$ENV_FILE"
-    echo "  Created $ENV_FILE (permissions 600)."
+    echo ""
+    echo "  Optional: drop your contact email into $TOML_FILE so polite-pool"
+    echo "  source APIs (arXiv, CrossRef, OpenAlex) give you better rate limits."
+    echo "  Example:"
+    echo '    contact_email = "you@example.com"'
   fi
-
-  echo ""
-  echo "  Now paste your API keys into: $ENV_FILE"
-  echo "    XAI_API_KEY=          (https://console.x.ai)"
-  echo "    PERPLEXITY_API_KEY=   (https://perplexity.ai/settings/api)"
-  echo "    YOUTUBE_API_KEY=      (https://console.cloud.google.com — optional)"
-  echo ""
-  read -r -p "  Press Enter to open the file in your default editor (or Ctrl+C to skip)... " _
-  ${EDITOR:-open} "$ENV_FILE"
 fi
 
 echo ""

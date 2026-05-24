@@ -48,8 +48,8 @@
 </p>
 
 <p align="center">
-  <strong>v0.8 (May 2026):</strong> <code>/notebooklm</code> rewritten to use Google's Gemini File Search API.<br/>
-  <em>One HTTP call. No browser. Source-grounded synthesis over your own vault.</em><br/>
+  <strong>v1.0 (May 2026):</strong> research toolkit rewritten to use only free, key-less sources.<br/>
+  <em>arXiv, Semantic Scholar, OpenAlex, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to. Zero API keys.</em><br/>
   <a href="CHANGELOG.md">See the changelog &rarr;</a>
 </p>
 
@@ -73,13 +73,13 @@
 </p>
 
 <p align="center">
-  <strong>Research toolkit · dual-track</strong><br/>
-  <code>/x-read</code> · <code>/x-pulse</code> · <code>/research</code> · <code>/research-deep</code> · <code>/notebooklm</code> · <code>/youtube</code>
+  <strong>Research toolkit · free, zero API keys required</strong><br/>
+  <code>/research</code> · <code>/research-deep</code> · <code>/discourse-pulse</code> · <code>/thread-read</code> · <code>/youtube</code> · <code>/idea-discovery</code> · <code>/vault-deep-synthesis</code>
 </p>
 
 <p align="center">
-  <em><strong>Open-web track</strong> · <code>/research-deep</code> via Perplexity + Grok. Pulls fresh signal from outside.<br/>
-  <strong>Source-grounded track</strong> · <code>/notebooklm</code> via Gemini File Search. Reads your own vault.<br/>
+  <em><strong>Open-web track</strong> · <code>/research</code> / <code>/research-deep</code> hit arXiv, Semantic Scholar, OpenAlex, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to. Synthesis by the calling Claude session.<br/>
+  <strong>Vault-grounded track</strong> · <code>/vault-deep-synthesis</code> reads your own vault directly. No network, no external LLM.<br/>
   Run both for high-stakes topics. <strong>Contradictions across the two are where the insight is.</strong></em>
 </p>
 
@@ -168,20 +168,20 @@ Claude generates a visual canvas of your entire vault. Hub nodes centered, color
 **You start a new day:** `/obsidian-daily`
 Claude pulls your calendar events, overdue tasks, and overnight changes into today's note. Your morning starts informed.
 
-**Someone shares an X post:** `/x-read https://x.com/...`
-Grok with live X access fetches the post, the thread, and the replies. Returns verbatim text + TL;DR + key claims + reply sentiment + voices to watch. No more screenshots.
+**Someone shares a HN or Reddit thread:** `/thread-read https://news.ycombinator.com/item?id=...`
+Pulls the top-level post and comment tree, summarizes verbatim quotes + key claims + sentiment + voices to watch. No screenshots. No API key.
 
-**You're planning today's content:** `/x-pulse "AI automation"`
-Grok scans X for what's trending in your topic right now. Returns 3-5 emerging themes (with rep posts + key voices), gaps nobody is filling, hook formats that are working, and 3 specific post ideas you could write today.
+**You're planning today's content:** `/discourse-pulse "AI automation"`
+Scans HackerNews, Reddit, Lobsters, and dev.to for what's trending in your topic right now. Returns emerging themes (with rep posts + key voices), gaps nobody is filling, hook formats that are working, and post ideas you could write today.
 
 **You need real research:** `/research "AI memory tools"`
-Perplexity Sonar Pro pulls a deep dossier with citations: summary, key facts (every claim with a recency marker and source domain), timeline, key players, contrarian views, recommended further reading, open questions. Saved to your vault, auto-opens in Obsidian.
+Hits arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HN, Reddit, Lobsters, dev.to in parallel. Claude synthesizes a deep dossier with citations: summary, key facts (every claim with a recency marker and source domain), timeline, key players, contrarian views, recommended further reading, open questions. Saved to your vault, auto-opens in Obsidian. Add `--academic` to restrict to peer-reviewed sources.
 
 **You want vault-first deep research:** `/research-deep "AI memory tools"`
-Scans your vault for what you already know. Identifies gaps. Spawns 3-5 targeted searches via Perplexity (web) and Grok (X discourse). Synthesizes a delta report — what's new, what's confirmed, contradictions to resolve, recommended vault updates. Vault baseline doesn't get re-researched. Only gaps get filled.
+Scans your vault for what you already know. Identifies gaps. Spawns targeted searches across the free-source set above. Synthesizes a delta report - what's new, what's confirmed, contradictions to resolve, recommended vault updates. Vault baseline does not get re-researched. Only gaps get filled.
 
 **You hit a great YouTube video:** `/youtube https://youtu.be/...`
-Free transcript via youtube-transcript-api. Optional metadata + top comments via YouTube Data API v3. Grok summarizes into TL;DR, Key Points, Notable Quotes (verbatim), Themes, Comment Sentiment, and Worth Following Up On. Saved as an AI-first note in your vault.
+Free transcript via youtube-transcript-api. Metadata scraped from the page (no YouTube Data API key required). Claude summarizes into TL;DR, Key Points, Notable Quotes (verbatim), Themes, and Worth Following Up On. Saved as an AI-first note in your vault.
 
 **You never open Obsidian.** Everything happens through Claude.
 
@@ -202,9 +202,9 @@ Free transcript via youtube-transcript-api. Optional metadata + top comments via
 | Sharing vault data | Only Claude can read it | `/export` gives any AI tool a clean snapshot |
 | Facts change over time | Old info gets overwritten | Bi-temporal facts track when it was true AND when the vault learned it |
 | Starting a new session | Re-explain who you are | `CRITICAL_FACTS.md` loads your identity in ~120 tokens |
-| Reading an X thread | Open X, scroll, screenshot, paste | `/x-read [url]` returns post + thread + sentiment + voices |
-| Knowing what to post | Guess what's trending | `/x-pulse` scans X and returns hot themes + gaps + hooks + post ideas |
-| Web research | Open 12 tabs, copy quotes manually | `/research [topic]` returns a sourced dossier with recency markers |
+| Reading a HN or Reddit thread | Open the page, scroll, copy quotes | `/thread-read [url]` returns post + comments + sentiment + voices |
+| Knowing what to post | Guess what's trending | `/discourse-pulse` scans HN/Reddit/Lobsters/dev.to and returns hot themes + gaps + hooks + post ideas |
+| Web research | Open 12 tabs, copy quotes manually | `/research [topic]` returns a sourced dossier with recency markers (free, no keys) |
 | Researching what you already know | Re-research from scratch | `/research-deep` scans vault first, fills only the gaps, flags contradictions |
 | YouTube videos | Watch passively, forget | `/youtube [url]` transcript + summary + quotes saved to vault |
 | Vault notes for future-Claude | Notes for human reading | AI-first rule: every note has "For future Claude" preamble + recency markers + citations |
@@ -231,8 +231,8 @@ Free transcript via youtube-transcript-api. Optional metadata + top comments via
   |                                          |
   +------------------------------------------+
   |                                          |
-  |   LAYER 4: Research Toolkit (6 commands) |
-  |   Claude pulls knowledge in              |
+  |   LAYER 4: Research Toolkit (7 commands) |
+  |   Claude pulls knowledge in (free)       |
   |                                          |
   +------------------------------------------+
   |                                          |
@@ -246,7 +246,7 @@ Free transcript via youtube-transcript-api. Optional metadata + top comments via
 **Layer 1** saves, organizes, ingests, reconciles, exports, and maintains your vault.
 **Layer 2** challenges your ideas, surfaces hidden patterns, bridges unrelated domains, and graduates ideas into projects.
 **Layer 3** loads your identity and current state so every session picks up where the last one ended.
-**Layer 4** pulls live external knowledge into the vault: X posts, X trends, web research with citations, YouTube transcripts. Vault-first synthesis knows what you already know.
+**Layer 4** pulls live external knowledge into the vault from free, key-less sources: HN/Reddit/Lobsters/dev.to discourse, arXiv/Semantic Scholar/OpenAlex/CrossRef papers, DuckDuckGo + Wikipedia, YouTube transcripts. Vault-first synthesis knows what you already know.
 **Always On** keeps the vault alive without you lifting a finger.
 
 ---
@@ -297,18 +297,19 @@ Free transcript via youtube-transcript-api. Optional metadata + top comments via
 
 ### Research -- Claude pulls knowledge in
 
-Powered by xAI Grok (live X access) + Perplexity Sonar (web research) + YouTube. Findings save to `Research/` as AI-first notes (preamble, frontmatter, recency markers, sources verbatim).
+Seven commands hit only free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is performed by the calling Claude session - no external LLM API. Findings save to `Research/` as AI-first notes (preamble, frontmatter, recency markers, sources verbatim).
 
 | Command | What it does |
 |---|---|
-| `/x-read [url]` | Deep-read an X post — verbatim post + thread + TL;DR + claims + reply sentiment + voices |
-| `/x-pulse [topic]` | Scan X for what's trending — themes, voices, hooks, post ideas |
-| `/research [topic]` | Web research with citations — full dossier with recency markers and open questions |
-| `/research-deep [topic]` | Vault-first synthesis (open web) — scans your vault, finds gaps, fills them via Perplexity + Grok, propagates updates across people/projects/ideas |
-| `/notebooklm [topic]` | Vault-grounded synthesis via Gemini File Search. Uploads top 12 vault notes, returns a grounded answer with citations. No browser, one HTTP call. Pairs with `/research-deep` for dual-track research. |
-| `/youtube [url]` | Extract transcript + metadata + top comments → AI-first summary |
+| `/research [topic] [--academic]` | Multi-source dossier with citations. `--academic` restricts to arXiv + Semantic Scholar + OpenAlex + CrossRef. |
+| `/research-deep [topic]` | Vault baseline -> gap fetch -> delta synthesis -> propagation across people/projects/ideas. |
+| `/discourse-pulse [topic]` | Scan HN, Reddit, Lobsters, dev.to for what's trending - themes, voices, hooks, post ideas |
+| `/thread-read [url]` | Read one HN or Reddit thread - verbatim post + comment tree + sentiment + voices |
+| `/youtube [url]` | Transcript + scraped metadata. No YouTube API key required. |
+| `/idea-discovery [seed]` | Surface 3-5 next directions by scanning Ideas/, Projects/ open questions, orphan Research/ notes |
+| `/vault-deep-synthesis [topic]` | Cross-note vault synthesis. No network, no external LLM. Pairs with `/research-deep` for dual-track research. |
 
-**Setup:** copy `.env.example` to `~/.config/obsidian-second-brain/.env`, add your keys (xAI, Perplexity, YouTube optional). Run `install.sh` and answer "y" to the research prompt to do this automatically.
+**Setup:** zero keys required. Optional: drop a `contact_email` into `~/.config/obsidian-second-brain/research.toml` to enter polite-pool HTTP headers (arXiv / CrossRef / OpenAlex give better rate limits). Run `uv sync` once to install Python deps.
 
 <details>
 <summary><strong>See the thinking tools in action</strong></summary>
@@ -368,95 +369,93 @@ An idea from 3 weeks ago. Claude reads it, finds related projects and people, ge
 
 <br />
 
-**`/x-read https://x.com/garrytan/status/2048121438914154664`**
+**`/thread-read https://news.ycombinator.com/item?id=...`**
 
-Grok with live X access fetches the post and replies. You get verbatim text, TL;DR, key claims, reply sentiment (~70% positive, 20% skeptical, 10% off-topic), notable counter-arguments with the @ handles of who said them, and "voices to watch" — replies that added real signal. ~$0.05/call.
+Pulls the post and the comment tree via the HN/Reddit JSON APIs, then Claude summarizes: verbatim top quotes, key claims, sentiment breakdown, notable counter-arguments with the usernames who made them, and "voices to watch" - commenters who added real signal. No API key.
 
 ---
 
-**`/x-pulse "AI automation"`**
+**`/discourse-pulse "AI automation"`**
 
 ```
 WHAT'S HOT (last 24-72h)
-  1. Agentic AI vs Basic Automation — voices: @NVIDIAAP, @woisau1
-  2. Self-Improving Sovereign Agents — voices: @tom_doerr, @AIDailyGems
-  3. Control Layers & Execution Gaps — voices: @ZIQING_JP
+  1. Agentic AI vs Basic Automation - voices: hn:dang, r/MachineLearning
+  2. Self-Improving Sovereign Agents - voices: lobsters:icefox
+  3. Control Layers & Execution Gaps - voices: dev.to:bekbrace
 
 WHAT'S UNDEREXPLORED
   - ROI numbers for non-developer small business users
   - Integration of digital agents with physical robotics
 
 HOOKS THAT ARE WORKING
-  - "Automation executes. Autonomy reasons." — @NVIDIAAP
+  - "Automation executes. Autonomy reasons."
 
 POST IDEAS FOR YOU TODAY
   1. Thread: "I gave an open-source agent its own GitHub repo and watched it self-improve"
   2. Single: "Automation executes. Autonomy reasons. Here's the control layer..."
 ```
 
-What you'd spend 2 hours scrolling X to find. Returned in 30 seconds for ~$0.13.
+What you'd spend 2 hours scrolling to find. Returned in seconds, with zero API keys.
 
 ---
 
 **`/research "AI memory tools"`**
 
-Returns a structured dossier: Summary, Key Facts (each with `(as of YYYY-MM, source.com)`), Timeline, Key Players, Contrarian Views, Recommended Further Reading, Open Questions, full citations. Saved to `Research/Web/` as an AI-first note. ~$0.05/call.
+Hits arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HN, Reddit, Lobsters, dev.to in parallel. Claude returns a structured dossier: Summary, Key Facts (each with `(as of YYYY-MM, source.com)`), Timeline, Key Players, Contrarian Views, Recommended Further Reading, Open Questions, full citations. Saved to `Research/Web/` as an AI-first note. Add `--academic` to restrict to peer-reviewed sources only.
 
 ---
 
-**`/research-deep "AI memory tools"`** — the killer
+**`/research-deep "AI memory tools"`** - the killer
 
 ```
 Phase 1: Vault scan
-  Found 8 relevant notes (e.g. Knowledge/2026-02-15 — Mem0 vs Letta.md)
+  Found 8 relevant notes (e.g. Knowledge/2026-02-15 - Mem0 vs Letta.md)
 
-Phase 2: Gap analysis (Perplexity sonar-pro)
+Phase 2: Gap analysis
   Identified 5 targeted queries to fill what vault is silent or stale on
 
-Phase 3: Targeted research
-  [web] Anthropic Claude memory tool 2026 features
-  [web] Mem0 Series A reactions and concerns
-  [x]   developer reactions to Letta vs Mem0
+Phase 3: Targeted research (free sources)
+  [arxiv]    "memory mechanisms transformer 2026"
+  [semschol] "long-term memory agent architectures"
+  [hn]       "developer reactions to Letta vs Mem0"
   ...
 
-Phase 4: Synthesis (sonar-reasoning-pro)
-  → What's New Since Vault Baseline
-  → What's Confirmed
-  → Contradictions / Updates Needed (with [[wikilinks]] to specific vault files)
-  → Synthesis bullets
-  → Recommended Vault Updates (instructions for /obsidian-save)
-  → Open Questions
+Phase 4: Synthesis (Claude)
+  -> What's New Since Vault Baseline
+  -> What's Confirmed
+  -> Contradictions / Updates Needed (with [[wikilinks]] to specific vault files)
+  -> Synthesis bullets
+  -> Recommended Vault Updates (instructions for /obsidian-save)
+  -> Open Questions
 ```
 
-Vault-first means it doesn't waste tokens re-researching what you already knew. ~$0.40/call.
+Vault-first means it does not waste effort re-researching what you already knew.
 
 ---
 
-**`/notebooklm "AI-first vault rule"`** — vault-grounded, no browser
+**`/vault-deep-synthesis "AI-first vault rule"`** - vault-grounded, no network
 
-Scans the vault, uploads the top 12 most relevant notes to a Gemini File Search store, asks Gemini 2.5 Flash to synthesize against THOSE sources only with citations, writes the synthesis to `Research/NotebookLM/` as an AI-first note, deletes the store.
+Scans the vault, identifies the 12 most relevant notes, and Claude synthesizes against THOSE sources only with citations. Writes the synthesis to `Research/Vault-Synthesis/` as an AI-first note. No external LLM, no API keys.
 
 ```
 Vault baseline: 12 notes
-Model: gemini-2.5-flash
-Uploading 12 notes... done
-Asking Gemini, grounded against the uploaded sources...
+Synthesizing across vault notes...
 
 === SAVED ===
-Research/NotebookLM/2026-05-15 - ai-first-vault-rule.md
+Research/Vault-Synthesis/2026-05-15 - ai-first-vault-rule.md
 ```
 
-Pair with `/research-deep` on the same topic. Open-web view + vault-grounded view rarely contradict. Where they do, that's where you have a take worth posting. ~$0.004/call on free-tier Flash, ~$0.06 on paid Pro.
+Pair with `/research-deep` on the same topic. Open-web view + vault-grounded view rarely contradict. Where they do, that's where you have a take worth posting.
 
 ---
 
 **`/youtube https://youtu.be/...`**
 
-Free transcript via youtube-transcript-api + optional metadata + comments via YouTube Data API v3 (free tier). Grok summarizes into TL;DR, Key Points, Notable Quotes (verbatim), Themes, Comment Sentiment, and Worth Following Up On. ~$0.04 for the Grok call. Frontmatter includes view count, channel, published date, like count for Dataview queries.
+Free transcript via youtube-transcript-api. Metadata scraped directly from the page (no YouTube Data API key required). Claude summarizes into TL;DR, Key Points, Notable Quotes (verbatim), Themes, and Worth Following Up On. Frontmatter includes view count, channel, and published date for Dataview queries.
 
 ---
 
-**Auto-open after every save** — Obsidian pops open at the new note. Disable with `RESEARCH_AUTOOPEN=0` if you're running batch saves.
+**Auto-open after every save** - Obsidian pops open at the new note. Disable with `RESEARCH_AUTOOPEN=0` if you're running batch saves.
 
 </details>
 
@@ -597,28 +596,33 @@ Then start your CLI from the vault root. Each build produces a platform-specific
 
 Run `bash scripts/build.sh` with no arguments to build all four platforms at once. See [`dist/<platform>/INSTALL.md`](scripts/build.sh) after building for platform-specific notes.
 
-### Research toolkit (optional)
+### Research toolkit (zero keys required)
 
-The 6 research commands need API keys. Run `install.sh` and answer "y" to the research prompt — it'll set up `~/.config/obsidian-second-brain/.env`. Or do it manually:
+The 7 research commands run on free, key-less sources. Just install Python deps:
 
 ```bash
-mkdir -p ~/.config/obsidian-second-brain
-cp .env.example ~/.config/obsidian-second-brain/.env
-chmod 600 ~/.config/obsidian-second-brain/.env
-# then paste keys into the file
 uv sync   # installs Python deps
 ```
 
-Keys you need:
+Optional: drop a `contact_email` into `~/.config/obsidian-second-brain/research.toml` so polite-pool source APIs (arXiv, CrossRef, OpenAlex) give you better rate limits.
 
-| Key | Where | Required for | Cost |
-|---|---|---|---|
-| `XAI_API_KEY` | [console.x.ai](https://console.x.ai) | `/x-read`, `/x-pulse`, `/research-deep` X pulse, `/youtube` summary | Pay-per-use, ~$0.05/call |
-| `PERPLEXITY_API_KEY` | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) | `/research`, `/research-deep` | Pay-per-use, ~$0.02-$0.50/call |
-| `GEMINI_API_KEY` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | `/notebooklm` (vault-grounded synthesis via Gemini File Search) | Free tier covers it. Paid: ~$0.004/call (Flash), ~$0.06/call (Pro). |
-| `YOUTUBE_API_KEY` | [console.cloud.google.com](https://console.cloud.google.com) | `/youtube` metadata + comments (optional, transcripts free without) | Free tier 10k units/day |
+```toml
+# ~/.config/obsidian-second-brain/research.toml
+contact_email = "you@example.com"
+```
 
-Without keys, the existing 27 vault commands still work fine. Research toolkit just degrades gracefully.
+Sources used (all free, no API keys):
+
+| Source | Used by |
+|---|---|
+| arXiv | `/research --academic`, `/research-deep` |
+| Semantic Scholar | `/research --academic`, `/research-deep` |
+| OpenAlex, CrossRef | `/research --academic`, `/research-deep` |
+| DuckDuckGo, Wikipedia | `/research`, `/research-deep` |
+| HackerNews, Reddit, Lobsters, dev.to | `/research`, `/research-deep`, `/discourse-pulse`, `/thread-read` |
+| youtube-transcript-api + page scrape | `/youtube` |
+
+The existing 27 vault commands need no Python at all - they're pure markdown commands. The research toolkit is the only layer that touches the network.
 
 ---
 
@@ -643,7 +647,7 @@ Yes. The repo ships a build script that compiles the platform-neutral source int
 Yes. The skill writes to your vault as standard markdown files. Obsidian Sync, iCloud, Syncthing, and Git-based sync all work without modification.
 
 ### Do I need API keys to use this?
-No. The original 27 vault commands (`/obsidian-save`, `/obsidian-daily`, etc.) work without any API keys. Only the 6 research commands (`/x-read`, `/x-pulse`, `/research`, `/research-deep`, `/notebooklm`, `/youtube`) require API keys for xAI Grok, Perplexity, Google Gemini, and optionally YouTube Data API v3. Without keys, those commands degrade gracefully — they exit with a clear setup message.
+No. The entire skill works with zero API keys. The 27 vault commands have always been pure markdown. As of v1.0, the 7 research commands (`/research`, `/research-deep`, `/discourse-pulse`, `/thread-read`, `/youtube`, `/idea-discovery`, `/vault-deep-synthesis`) also run on free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is done by the calling Claude session.
 
 ### How is this different from Notion AI or Mem?
 Notion AI and Mem are closed-source SaaS products that own your data. This skill stores everything as plain markdown in your local Obsidian vault, with no vendor lock-in. The AI is on top of your data, not behind it. You can switch tools or stop using the skill at any point and still have your full vault.
@@ -655,10 +659,10 @@ The principle that vault notes are written for future-Claude to retrieve and rea
 Yes. The skill never deletes or modifies notes destructively without explicit confirmation. Existing notes stay as-is. New notes follow the AI-first rule. `/obsidian-health` flags pre-AI-first notes so you can update them on your own schedule.
 
 ### What does `/research-deep` do that `/research` doesn't?
-`/research` runs a single Perplexity query and returns a dossier with citations. `/research-deep` is vault-first: it scans your existing notes, identifies what you already know about the topic, spawns 3-5 targeted follow-up searches to fill only the gaps, and produces a delta report (what's new, what's confirmed, contradictions to resolve, recommended vault updates). Vault-first means you stop re-researching what's already in your notes.
+`/research` hits the free-source set in parallel and returns a dossier with citations. `/research-deep` is vault-first: it scans your existing notes, identifies what you already know about the topic, spawns 3-5 targeted follow-up searches across the same free sources to fill only the gaps, and produces a delta report (what's new, what's confirmed, contradictions to resolve, recommended vault updates). Vault-first means you stop re-researching what's already in your notes.
 
 ### What do the research commands cost?
-Approximate per-call costs as of 2026-04: `/x-read` ~$0.05, `/x-pulse` ~$0.13, `/research` ~$0.04, `/research-deep` ~$0.40-$0.80, `/youtube` ~$0.04. Costs for Grok calls are logged to `~/.research-toolkit/usage.log` for visibility. No hard caps — you're trusted to monitor your own spend.
+Nothing. As of v1.0, the research toolkit uses only free, key-less sources. Old paid integrations (xAI Grok, Perplexity, Gemini, YouTube Data API) live under `scripts/research/_deprecated/` for fork users who want to bring them back; they are not used by the default install.
 
 ### Can I use this on Windows or Linux?
 The core vault commands work anywhere Claude Code runs. The research toolkit was tested on macOS — `install.sh` and the auto-open behavior assume macOS conventions (`~/.config`, `open` command). Pull requests welcome to add Windows and Linux paths.
