@@ -63,9 +63,10 @@ Discord / Claude Code CLI
   ▼
 scripts/research/research.py <topic> [--academic]
   │
-  │  Spawn 8 parallel source clients via ThreadPoolExecutor:
-  │    lib/sources/{duckduckgo, wikipedia, hackernews, reddit,
-  │                 arxiv, semantic_scholar, openalex, crossref}.py
+  │  Spawn N parallel source clients via ThreadPoolExecutor.
+  │  N depends on command (6 for /research default, 4 for --academic,
+  │  4 for /discourse-pulse, etc. — see §5). All clients live under
+  │  lib/sources/ and share the SourceClient interface.
   │
   │  Aggregate results into JSON; print to stdout.
   ▼
