@@ -1,3 +1,10 @@
+"""
+DEPRECATED in v1.0 - replaced by scripts/research/lib/sources/*.py (free sources)
+and Claude-side synthesis. This file is kept only as an escape hatch for users
+who want to bring back paid-API behavior via a custom fork. Not imported by any
+current command. Will be removed in v2.0.
+"""
+
 """Perplexity Sonar client. Uses the OpenAI-compatible /chat/completions endpoint."""
 
 import re
