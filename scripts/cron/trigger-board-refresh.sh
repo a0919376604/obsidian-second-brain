@@ -8,8 +8,10 @@ REPO=/Users/leric/Desktop/code/obsidian-second-brain
 PROMPT=$REPO/scripts/cron/board-refresh-prompt.txt
 LOG=/tmp/langlive-board-refresh.log
 
-# Pick up the user's shell environment (claude CLI, PATH, etc.)
-source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null || true
+# launchd strips most env vars and doesn't run shell rc files.
+# Set PATH explicitly so `claude` (and node, git, etc.) resolve.
+# (Don't `source ~/.zshrc` — zsh syntax is fatal under bash.)
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 cd "$REPO"
 
