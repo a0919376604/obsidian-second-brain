@@ -61,8 +61,9 @@ Target (capture mode): `Projects/<P>/Learnings/YYYY-MM-DD-<slug>.md`
 3. Spawn parallel subagents to gather learnings:
 
    - **Lessons agent**: scan all daily notes for "Lesson learned" sections, "What didn't" sections, evening review insights
-   - **Decisions agent**: read all ADRs in `wiki/decisions/` — extract the rationale and outcome of each
-   - **Reports agent**: read recent emerge/synthesize/connect/challenge reports in `wiki/concepts/` (the auto-generated pattern reports)
+   - **Decisions agent**: read all ADRs in `Projects/*/Decisions/` (project-scoped, new layout) and `Knowledge/ADR-*.md` (legacy location, may still exist) — extract the rationale and outcome of each
+   - **Learnings agent**: read all per-project learnings in `Projects/*/Learnings/` (new in hybrid layout) — these are the explicit captures from `/obsidian-learn --capture`
+   - **Reports agent**: read recent emerge/synthesize/connect/challenge reports in `Knowledge/` (the auto-generated pattern reports)
    - **Mistakes agent**: scan dev logs and daily notes for "what didn't work", "wasted time on", "next time", "lesson", phrases indicating learning from failure
    - **Wins agent**: scan for patterns that worked — "this saved time", "this approach worked", recurring success patterns
 
@@ -92,7 +93,7 @@ Target (capture mode): `Projects/<P>/Learnings/YYYY-MM-DD-<slug>.md`
    ## Top 5 Lessons of the Period
    - Most impactful learnings ranked by frequency × recency × consequence
 
-6. Save the report to `wiki/concepts/YYYY-MM-DD — Learnings Review.md`
+6. Save the report to `Reviews/YYYY-MM-DD - Learnings Review.md` (vault-wide review default; if `--project=<P>` was passed to review mode, save to `Projects/<P>/Recaps/YYYY-MM-DD-learnings-review.md` instead)
 7. Append to the operation log: if `Logs/` exists write `**HH:MM** - learn | X active, Y stale, Z superseded, N promotion candidates` to `Logs/YYYY-MM-DD.md`; otherwise append `## [YYYY-MM-DD] learn | X active, Y stale, Z superseded, N promotion candidates` to `log.md`
 8. Update today's daily note with a brief summary
 9. Offer to:
