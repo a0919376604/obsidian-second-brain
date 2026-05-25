@@ -6,7 +6,14 @@ triggers_en: ["research this", "look up", "find info on", "web research"]
 
 Use the obsidian-second-brain skill. Execute `/research $ARGUMENTS`:
 
-The argument is the research topic. Optional flag `--academic` restricts to arXiv / Semantic Scholar / OpenAlex / CrossRef only.
+The argument is the research topic. Optional flag `--academic` restricts to arXiv / Semantic Scholar / OpenAlex / CrossRef only. Optional flag `--project=<name>` routes output into a project folder.
+
+## Project routing
+
+Without a project: write to default cross-project research folder (`Research/Web/YYYY-MM-DD-<slug>.md`; `Research/Academic/` if `--academic`).
+With `--project=<name>` flag: write to `Projects/<name>/Research/<slug>-web.md`.
+
+Frontmatter additions when project-scoped: add `project: "[[<name>]]"` and `tags: [research, <name>, web]`.
 
 1. Read `_CLAUDE.md` first if it exists in the vault root.
 
@@ -39,7 +46,11 @@ The argument is the research topic. Optional flag `--academic` restricts to arXi
    - `## Open Questions` - gaps the JSON didn't fill
    - `## Sources` - every URL from the JSON, deduped, grouped by source name
 
-5. Save to `Research/Web/YYYY-MM-DD-<slug>.md` (or `Research/Academic/` if `--academic`). Frontmatter:
+5. Save to:
+   - `Research/Web/YYYY-MM-DD-<slug>.md` (default, no project; use `Research/Academic/` if `--academic`)
+   - OR `Projects/<P>/Research/<slug>-web.md` (if `--project=<P>` was passed)
+
+   Frontmatter:
 
    ```yaml
    ---

@@ -6,7 +6,14 @@ triggers_en: ["deep research", "thorough research", "vault-first research"]
 
 Use the obsidian-second-brain skill. Execute `/research-deep $ARGUMENTS`:
 
-The argument is the topic.
+The argument is the topic. Optional flag `--project=<name>` routes output into a project folder.
+
+## Project routing
+
+Without a project: write to default cross-project research folder (`Research/Deep/YYYY-MM-DD-<slug>.md`).
+With `--project=<name>` flag: write to `Projects/<name>/Research/<slug>-deep.md`.
+
+Frontmatter additions when project-scoped: add `project: "[[<name>]]"` and `tags: [research, <name>, deep]`.
 
 1. Read `_CLAUDE.md` first.
 
@@ -38,7 +45,11 @@ The argument is the topic.
    }
    ```
 
-6. **Phase 4 - synthesize delta** and save to `Research/Deep/YYYY-MM-DD-<slug>.md`. Sections:
+6. **Phase 4 - synthesize delta** and save to:
+   - `Research/Deep/YYYY-MM-DD-<slug>.md` (default, no project)
+   - OR `Projects/<P>/Research/<slug>-deep.md` (if `--project=<P>` was passed)
+
+   Sections:
 
    - `## For future Claude` preamble
    - `## Vault Baseline` - what we already knew (with `[[wikilinks]]` to existing notes)
