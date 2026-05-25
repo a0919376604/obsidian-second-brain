@@ -4,9 +4,11 @@
 
 **Goal:** Activate the langlive-line-oa knowledge pipeline on top of the Plan 1 foundation: create a `/obsidian-notion-sync` slash command for MCP-based Notion writes, schedule two crons (Mon-Fri 09:00 board refresh + Saturday 12:00 weekly recap), and dry-run the full pipeline end-to-end. Covers Phases 5-7 of `docs/superpowers/specs/2026-05-25-vault-hybrid-architecture-and-pipeline-design.md`.
 
-**Architecture:** A new `/obsidian-notion-sync` slash command wraps the Notion MCP calls (auto-discover/create main page + Weekly Recaps DB + Decisions Archive, then write/append). Two `/schedule` cron routines: a lightweight Mon-Fri 09:00 board refresh that runs `/obsidian-board langlive-line-oa --refresh` and posts a one-line Discord summary on change; a Saturday 12:00 weekly-recap pipeline that runs `/obsidian-recap --project=langlive-line-oa --weekly`, translates the recap to Chinese, posts to Discord channel, and (on `ok` reply) calls `/obsidian-notion-sync` to push Current Roadmap + Weekly Recap entry to Notion. Reply handling uses the claude-discord plugin's channel-watch behavior — user replies trigger downstream sync in a follow-up Claude session.
+**Architecture:** A new `/obsidian-notion-sync` slash command wraps the Notion MCP calls (auto-discover/create main page + Weekly Recaps DB + Decisions Archive, then write/append). Two **macOS launchd** routines (NOT `/schedule` — see amendment below): a lightweight Mon-Fri 09:00 board refresh that runs `/obsidian-board langlive-line-oa --refresh` and posts a one-line Discord summary on change; a Saturday 12:00 weekly-recap pipeline that runs `/obsidian-recap --project=langlive-line-oa --weekly`, translates the recap to Chinese, posts to Discord channel, and (on `ok` reply) calls `/obsidian-notion-sync` to push Current Roadmap + Weekly Recap entry to Notion. Reply handling uses the claude-discord plugin's channel-watch behavior — user replies trigger downstream sync in a follow-up Claude session.
 
-**Tech Stack:** `/schedule` (CronCreate underneath), claude-discord plugin (`react`, `reply`, `fetch_messages`, `edit_message`), Notion MCP (`mcp__notion__API-post-search`, `mcp__notion__API-post-page`, `mcp__notion__API-patch-block-children`, `mcp__notion__API-create-a-data-source`, `mcp__notion__API-query-data-source`), Markdown slash-command prompts.
+**Architecture amendment (2026-05-25 mid-execution):** Originally designed around `/schedule` (Anthropic Cloud remote agents), but those agents have NO access to the user's local vault (`~/Documents/SecondBrain`) and NO access to local MCP servers (Notion MCP + claude-discord plugin are installed locally on the user's Mac). Switched to **macOS launchd** so the cron-fired Claude session runs locally with full access to vault + local MCP. User confirmed their Mac is awake at the relevant times (Mon-Fri 09:00 + Sat 12:00 = working hours).
+
+**Tech Stack:** macOS launchd (`.plist` in `~/Library/LaunchAgents/`), Claude Code CLI (`claude -p`) for headless prompt execution, claude-discord plugin (`react`, `reply`, `fetch_messages`, `edit_message`), Notion MCP (`mcp__notion__API-post-search`, `mcp__notion__API-post-page`, `mcp__notion__API-patch-block-children`, `mcp__notion__API-create-a-data-source`, `mcp__notion__API-query-data-source`), Markdown slash-command prompts, shell scripts for launchd → Claude bridging.
 
 **Prerequisites:**
 - Plan 1 COMPLETE — vault is at hybrid layout, 14 commands routed, CLAUDE.md rules in place
@@ -27,15 +29,22 @@
 
 - `CHANGELOG.md` — Unreleased section, document the new command + crons
 
+### Files created (in repo `scripts/cron/`)
+
+- `scripts/cron/board-refresh-prompt.txt` — the prompt passed to `claude -p` by the daily launchd trigger
+- `scripts/cron/weekly-recap-prompt.txt` — the prompt passed to `claude -p` by the Saturday launchd trigger
+- `scripts/cron/trigger-board-refresh.sh` — wrapper script (sets cwd, env, pipes prompt to `claude -p`)
+- `scripts/cron/trigger-weekly-recap.sh` — same shape, for Saturday recap
+
 ### Files created outside the repo
 
-- 2 cron routines via `/schedule create`:
-  - `langlive-line-oa-board-refresh` (Mon-Fri 09:00 Asia/Taipei)
-  - `langlive-line-oa-weekly-recap` (Saturday 12:00 Asia/Taipei)
+- 2 launchd plists in `~/Library/LaunchAgents/`:
+  - `com.langlive.board-refresh.plist` (Mon-Fri 09:00 local time)
+  - `com.langlive.weekly-recap.plist` (Saturday 12:00 local time)
 - Notion structure (auto-created by first runs):
-  - Main page `langlive-line-oa` (or use existing if present)
-  - Weekly Recaps database
-  - Decisions Archive sub-page
+  - Main page `langlive-line-oa` — **EXISTS** as of 2026-05-25 (id `36a5749a-ca1c-8142-b05b-f3ff80b712cf`, parent: a Notion database row in the user's Project Tracker)
+  - Weekly Recaps database (auto-create on first run as child of main page)
+  - Decisions Archive sub-page (auto-create on first ADR sync)
 
 ### Files NOT modified
 
@@ -280,17 +289,25 @@ git commit -m "feat(commands): /obsidian-notion-sync — Notion MCP sync for rec
 
 ## Phase 6 — Schedule the two crons
 
-### Task 3: Author the daily board-refresh cron routine
+### Task 3: Author the daily board-refresh prompt file
 
 **Files:**
-- No file created in this repo — `/schedule create` registers the routine with the cron service.
+- Create: `scripts/cron/board-refresh-prompt.txt`
 
-- [ ] **Step 1: Construct the cron prompt**
+- [ ] **Step 1: Create the directory**
 
-The routine, when fired, will start a Claude session whose entire input is the prompt below. Claude executes it and exits.
+```bash
+mkdir -p /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron
+```
+
+- [ ] **Step 2: Write the prompt to a text file**
+
+The launchd-triggered `claude -p` session will receive this text as its sole input.
+
+Create `scripts/cron/board-refresh-prompt.txt` with this content:
 
 ```
-Mon-Fri 09:00 langlive-line-oa board refresh.
+Mon-Fri 09:00 langlive-line-oa board refresh (triggered by launchd).
 
 Steps:
 1. Run /obsidian-board langlive-line-oa --refresh (incremental from last-refresh timestamp in board frontmatter).
@@ -300,23 +317,31 @@ Steps:
 5. Append a one-line entry to today's Logs/YYYY-MM-DD.md.
 
 If anything fails, post "❌ Daily board refresh failed: <error>" to Discord and exit.
+
+You are running as a non-interactive `claude -p` invocation. Do not ask clarifying questions. Execute the steps and exit when done.
 ```
 
-- [ ] **Step 2: Verify the prompt has no placeholders**
+- [ ] **Step 3: Smoke check**
 
-Read through Step 1 once. Replace any `<...>` literals that aren't intentional templating with concrete values. The prompt above uses `<error>`, `N`, `M`, `K`, `P`, `J` as runtime substitution slots — these are fine because Claude substitutes them when the cron fires.
+```bash
+wc -l /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/board-refresh-prompt.txt
+cat /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/board-refresh-prompt.txt | head -3
+```
+Expected: ~14 lines, opens with "Mon-Fri 09:00 langlive-line-oa board refresh".
 
-- [ ] **Step 3: No commit** — the prompt is registered via `/schedule create` in Task 5.
+- [ ] **Step 4: Defer commit** — group with Tasks 4-6 file changes in Task 6's commit.
 
-### Task 4: Author the Saturday weekly-recap cron routine
+### Task 4: Author the Saturday weekly-recap prompt file
 
 **Files:**
-- No file created in this repo.
+- Create: `scripts/cron/weekly-recap-prompt.txt`
 
-- [ ] **Step 1: Construct the cron prompt**
+- [ ] **Step 1: Write the prompt to a text file**
+
+Create `scripts/cron/weekly-recap-prompt.txt` with this content:
 
 ```
-Saturday 12:00 langlive-line-oa weekly recap.
+Saturday 12:00 langlive-line-oa weekly recap (triggered by launchd).
 
 Steps:
 1. Run /obsidian-board langlive-line-oa --refresh (incremental). This ensures the recap reads a fresh board.
@@ -336,57 +361,193 @@ Steps:
 6. Append to today's Logs/YYYY-MM-DD.md: "**HH:MM** - weekly-recap | W<NN> posted, awaiting approval".
 
 If translation fails (LLM error, empty input), post "❌ Weekly recap translation failed: <error>" to Discord and STOP — don't post a half-baked recap.
+
+You are running as a non-interactive `claude -p` invocation. Do not ask clarifying questions. Execute the steps and exit when done.
 ```
 
-- [ ] **Step 2: Verify the prompt is idempotent** (running it twice on the same Saturday should be safe — second run regenerates the recap, replaces the file, posts a new message)
+- [ ] **Step 2: Smoke check**
 
-- [ ] **Step 3: No commit yet** — registered via `/schedule` in Task 6.
+```bash
+wc -l /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/weekly-recap-prompt.txt
+```
+Expected: ~22 lines.
 
-### Task 5: Register the daily board-refresh cron
+- [ ] **Step 3: Idempotency note** — running this prompt twice on the same Saturday is safe: second run regenerates the recap (overwrites the file), reposts to Discord. The Discord channel gets two posts — user picks the most recent.
+
+- [ ] **Step 4: Defer commit** — group with other cron files in Task 6's commit.
+
+### Task 5: Write trigger script + launchd plist for daily board-refresh
 
 **Files:**
-- No file in this repo.
+- Create: `scripts/cron/trigger-board-refresh.sh`
+- Create: `~/Library/LaunchAgents/com.langlive.board-refresh.plist`
 
-- [ ] **Step 1: Open a Claude session and invoke `/schedule create`**
+- [ ] **Step 1: Write the trigger script**
 
-Use the `/schedule` skill. When prompted, provide:
+Create `scripts/cron/trigger-board-refresh.sh` with this content:
 
-- **Name:** `langlive-line-oa-board-refresh`
-- **Cron:** `0 9 * * 1-5` (Mon-Fri 09:00 Asia/Taipei — verify the schedule service is set to that timezone, otherwise adjust to UTC equivalent)
-- **Prompt:** (paste the prompt from Task 3 Step 1)
+```bash
+#!/bin/bash
+# Triggered by launchd Mon-Fri 09:00 local time.
+# Pipes the prompt to `claude -p` for non-interactive execution.
 
-- [ ] **Step 2: Verify the routine was registered**
+set -euo pipefail
 
+REPO=/Users/leric/Desktop/code/obsidian-second-brain
+PROMPT=$REPO/scripts/cron/board-refresh-prompt.txt
+LOG=/tmp/langlive-board-refresh.log
+
+# Pick up the user's shell environment (claude CLI, PATH, etc.)
+source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null || true
+
+cd "$REPO"
+
+{
+  echo "==== $(date '+%Y-%m-%d %H:%M:%S') board-refresh fired ===="
+  claude -p "$(cat "$PROMPT")" --output-format text
+  echo "==== exit code: $? ===="
+} >> "$LOG" 2>&1
 ```
-/schedule list
+
+- [ ] **Step 2: Make script executable**
+
+```bash
+chmod +x /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-board-refresh.sh
 ```
 
-Expected: shows `langlive-line-oa-board-refresh` in the list with the cron expression and next-run time.
+- [ ] **Step 3: Write the launchd plist**
 
-- [ ] **Step 3: Document the routine's id (if the schedule service assigns one) in the spec's Open Questions** for future reference (e.g., to update or delete the routine later).
+Create `~/Library/LaunchAgents/com.langlive.board-refresh.plist` with this content:
 
-- [ ] **Step 4: No commit.**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.langlive.board-refresh</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-board-refresh.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/tmp/langlive-board-refresh.stdout</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/langlive-board-refresh.stderr</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+```
 
-### Task 6: Register the Saturday weekly-recap cron
+(launchd Weekday: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri. Hour/Minute are LOCAL time on macOS.)
+
+- [ ] **Step 4: Load the plist**
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.langlive.board-refresh.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/com.langlive.board-refresh.plist
+launchctl list | grep langlive
+```
+Expected: `launchctl list` shows `com.langlive.board-refresh` with PID `-` (not running yet) and exit code `0`.
+
+- [ ] **Step 5: Defer commit** — group with Task 6 (Saturday cron).
+
+### Task 6: Write trigger script + launchd plist for Saturday weekly-recap + commit cron files
 
 **Files:**
-- No file in this repo.
+- Create: `scripts/cron/trigger-weekly-recap.sh`
+- Create: `~/Library/LaunchAgents/com.langlive.weekly-recap.plist`
+- Commit: all 4 cron files (2 prompts + 2 trigger scripts) in this repo
 
-- [ ] **Step 1: Invoke `/schedule create`**
+- [ ] **Step 1: Write the trigger script**
 
-- **Name:** `langlive-line-oa-weekly-recap`
-- **Cron:** `0 12 * * 6` (Saturday 12:00 Asia/Taipei)
-- **Prompt:** (paste the prompt from Task 4 Step 1)
+Create `scripts/cron/trigger-weekly-recap.sh` with this content:
 
-- [ ] **Step 2: Verify**
+```bash
+#!/bin/bash
+# Triggered by launchd Saturday 12:00 local time.
 
+set -euo pipefail
+
+REPO=/Users/leric/Desktop/code/obsidian-second-brain
+PROMPT=$REPO/scripts/cron/weekly-recap-prompt.txt
+LOG=/tmp/langlive-weekly-recap.log
+
+source ~/.zshrc 2>/dev/null || source ~/.bashrc 2>/dev/null || true
+
+cd "$REPO"
+
+{
+  echo "==== $(date '+%Y-%m-%d %H:%M:%S') weekly-recap fired ===="
+  claude -p "$(cat "$PROMPT")" --output-format text
+  echo "==== exit code: $? ===="
+} >> "$LOG" 2>&1
 ```
-/schedule list
+
+- [ ] **Step 2: Make script executable**
+
+```bash
+chmod +x /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-weekly-recap.sh
 ```
 
-Expected: both routines listed (board-refresh + weekly-recap).
+- [ ] **Step 3: Write the launchd plist**
 
-- [ ] **Step 3: No commit.**
+Create `~/Library/LaunchAgents/com.langlive.weekly-recap.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.langlive.weekly-recap</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-weekly-recap.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>6</integer>
+        <key>Hour</key><integer>12</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/langlive-weekly-recap.stdout</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/langlive-weekly-recap.stderr</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+```
+
+(Weekday: 6=Saturday on launchd.)
+
+- [ ] **Step 4: Load the plist**
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.langlive.weekly-recap.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/com.langlive.weekly-recap.plist
+launchctl list | grep langlive
+```
+Expected: both `com.langlive.board-refresh` AND `com.langlive.weekly-recap` listed.
+
+- [ ] **Step 5: Commit all 4 cron files** (2 prompts + 2 trigger scripts) to the repo. The plists outside the repo are NOT committed.
+
+```bash
+cd /Users/leric/Desktop/code/obsidian-second-brain
+git add scripts/cron/
+git commit -m "feat(cron): launchd-fired trigger scripts + prompts for board-refresh + weekly-recap"
+```
 
 ### Task 7: Author the Discord reply-handler routine (decoupled sync)
 
@@ -446,9 +607,13 @@ This task simulates a real Saturday cron firing, end-to-end. Catches integration
 **Files:**
 - Read-only verification + a manual invocation of the recap pipeline
 
-- [ ] **Step 1: Manually trigger the Saturday cron prompt**
+- [ ] **Step 1: Manually trigger the Saturday cron path**
 
-Open a Claude session (in this repo's directory). Paste the Task 4 Step 1 prompt verbatim and execute.
+Two options:
+- (a) Run the trigger script directly: `bash /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-weekly-recap.sh`. Watch `/tmp/langlive-weekly-recap.log` with `tail -f`.
+- (b) Open a Claude session in this repo's directory and paste the contents of `scripts/cron/weekly-recap-prompt.txt` verbatim. Useful for debugging since you see Claude's intermediate output live.
+
+Option (a) tests the full launchd → script → claude-CLI path. Option (b) tests just the prompt logic.
 
 Verify:
 - `/obsidian-board langlive-line-oa --refresh` runs without error
@@ -482,14 +647,23 @@ In Discord, after a fresh recap post, reply with `edit: 用更口語的中文`. 
 
 - [ ] **Step 5: Test the daily board-refresh cron**
 
-Manually trigger the Task 3 Step 1 prompt. Verify:
+```bash
+bash /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-board-refresh.sh
+tail -50 /tmp/langlive-board-refresh.log
+```
+
+Verify:
 - `/obsidian-board langlive-line-oa --refresh` runs and updates `board.md`
 - A Discord post appears ONLY IF there were new commits/specs since the prior refresh (which there should be from this plan's commits)
 - Logs/YYYY-MM-DD.md has the new line
 
 - [ ] **Step 6: Trigger a no-op refresh**
 
-Run the daily cron prompt a second time, immediately after Step 5. Verify:
+```bash
+bash /Users/leric/Desktop/code/obsidian-second-brain/scripts/cron/trigger-board-refresh.sh
+```
+
+Immediately after Step 5. Verify:
 - `/obsidian-board` runs but reports no changes (incremental diff is empty)
 - NO Discord post (the cron suppresses on no-op per Task 3's prompt)
 - Logs/YYYY-MM-DD.md still gets the entry (so we know it ran)
