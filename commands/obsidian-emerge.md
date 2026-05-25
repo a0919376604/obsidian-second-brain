@@ -13,8 +13,8 @@ The optional argument is a timeframe (e.g., "2 weeks", "this month"). Default: l
 Resolve project name in priority order: (1) `--project=<name>` flag in `$ARGUMENTS`; (2) `## Active main project` line in vault `_CLAUDE.md`; (3) codebase CLAUDE.md `local-path` match for cwd; (4) none — read/write root `Ideas/` (default).
 
 Target folder:
-- No project resolved -> `Ideas/`
-- Project `<P>` resolved -> `Projects/<P>/Ideas/`
+- No project resolved → `Ideas/`
+- Project `<P>` resolved → `Projects/<P>/Ideas/`
 
 1. Read `_CLAUDE.md` first if it exists in the vault root
 2. Determine the date range from the argument (default: last 30 days)

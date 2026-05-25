@@ -13,8 +13,8 @@ The optional argument is the idea text. If not provided, pull the most recent id
 Resolve project name in priority order: (1) `--project=<name>` flag in `$ARGUMENTS`; (2) `## Active main project` line in vault `_CLAUDE.md`; (3) codebase CLAUDE.md `local-path` match for the current working directory; (4) none — write to root `Ideas/` (default).
 
 Target folder:
-- No project resolved -> `Ideas/<title>.md`
-- Project `<P>` resolved -> `Projects/<P>/Ideas/<title>.md`
+- No project resolved → `Ideas/<title>.md`
+- Project `<P>` resolved → `Projects/<P>/Ideas/<title>.md`
 
 1. Read `_CLAUDE.md` first if it exists in the vault root
 2. Take the argument as the idea, or pull from recent conversation context
