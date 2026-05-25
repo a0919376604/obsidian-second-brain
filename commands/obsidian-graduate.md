@@ -8,6 +8,15 @@ Use the obsidian-second-brain skill. Execute `/obsidian-graduate $ARGUMENTS`:
 
 The optional argument is the idea title, tag, or keyword. If not provided, scan recent notes for ideas tagged `#idea` or in the `Ideas/` folder and present them for selection.
 
+## Project routing
+
+The project name comes from `$ARGUMENTS` (if it's a project name) or is inferred from the idea title. Once resolved, graduate ALWAYS uses the sub-folder layout - there is no flat-mode for new projects.
+
+Created structure:
+- `Projects/<P>/<P>.md` (hub note)
+- `Projects/<P>/board.md` (kanban; created with empty Now/Next/Later sections + a `## 待辦` section)
+- `Projects/<P>/{Ideas,Tasks,Decisions,Learnings,Research,Competitors,Recaps}/` (empty skeleton folders)
+
 1. Read `_CLAUDE.md` first if it exists in the vault root
 2. Find the idea to graduate:
    - If argument given: search `Ideas/`, daily notes, and captures for a matching idea (fuzzy match)
@@ -19,15 +28,27 @@ The optional argument is the idea title, tag, or keyword. If not provided, scan 
    - Past decisions that relate
    - Similar ideas that were previously explored (to avoid reinventing)
 5. Generate a full project spec:
-   - **Project note** in `Projects/` with complete frontmatter (date, tags, status: planning, linked idea)
+   - **Hub note** at `Projects/<P>/<P>.md` with complete frontmatter (`date`, `tags: [project]`, `status: planning`, `linked-idea: [[<idea-title>]]`, `notion: { main_page_id: "", weekly_recaps_db_id: "", decisions_archive_page_id: "" }`, `local-path: "<TBD - ask user>"`)
    - **Description**: what this project is and why it matters
    - **Goals**: 3-5 concrete outcomes
-   - **Key tasks**: broken into phases with priorities
-   - **Open questions**: what still needs answering
+   - **Open Questions**: what still needs answering
    - **Related notes**: links to everything relevant found in step 4
-6. Create board entries:
-   - Add a card to the relevant kanban board in `Backlog` or `This Week`
-   - Add individual task cards if multiple phases
+   - **Sub-folder skeleton**: create `Projects/<P>/{Ideas,Tasks,Decisions,Learnings,Research,Competitors,Recaps}/` and add a `.gitkeep` in each
+6. Create the project's board:
+   - Create `Projects/<P>/board.md` with a `For future Claude` preamble, frontmatter (`type: board`, `project: "[[<P>]]"`, `ai-first: true`), and skeleton sections:
+     ```
+     ## 🔥 This Week
+     ### Now (≤3)
+     ### Next
+     ### Later
+
+     ## 待辦
+
+     ## 進行中
+
+     ## 已完成
+     ```
+   - The board's topic buckets (UI / UX / KB / Performance, etc.) populate later via `/obsidian-board <P> --refresh` once the project accumulates work.
 7. Update the original idea note:
    - Add `status: graduated` to frontmatter
    - Add a link to the new project note
