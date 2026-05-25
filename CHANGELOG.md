@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **File-based cache** at `~/.cache/obsidian-second-brain/research/` with 24h default TTL.
 - **`~/.config/obsidian-second-brain/research.toml`** for `contact_email` + SearXNG instance list + rate-limit overrides.
 - Plan 1 implementation reference: `docs/superpowers/plans/2026-05-25-vault-hybrid-foundation.md`.
+- `/obsidian-notion-sync` - new command that syncs vault recaps + ADRs to Notion via MCP, with auto-discovery and creation of Notion main page / Weekly Recaps DB / Decisions Archive sub-page.
+- Two `scripts/cron/` prompt files + trigger scripts for macOS launchd: `board-refresh` (Mon-Fri 09:00) and `weekly-recap` (Saturday 12:00). Originally designed for `/schedule` (Anthropic Cloud remote agents) but switched to launchd because remote agents can't access the local vault or local MCP servers.
+- Plan 2 implementation reference: `docs/superpowers/plans/2026-05-25-vault-hybrid-activation-layer.md`.
 
 ### Changed
 
