@@ -1,12 +1,59 @@
 ---
-description: Review vault learnings, prune stale ones, surface active patterns — the vault's lessons compound or expire
+description: Review vault learnings (default), OR capture a single learning at write time (--capture flag) — the vault's lessons compound or expire
 category: thinking
 triggers_en: ["review learnings", "what have I learned", "show lessons", "prune learnings"]
 ---
 
 Use the obsidian-second-brain skill. Execute `/obsidian-learn $ARGUMENTS`:
 
-The optional argument is a scope: `recent` (last 30 days, default), `all` (entire vault), or a topic name.
+The optional argument is a scope: `recent` (last 30 days, default), `all` (entire vault), or a topic name. Pass `--capture` (followed by the learning text) to run Capture mode instead.
+
+## Modes
+
+### Capture mode (`--capture` flag)
+
+Use when the user has JUST learned something during dev (Checkpoint 3: post-PR or post-implementation). Write a single learning note.
+
+1. Resolve project (see Project routing below). If unresolvable, ASK.
+2. Parse the learning from `$ARGUMENTS` (after the `--capture` flag) or from recent conversation context.
+3. Write `Projects/<P>/Learnings/YYYY-MM-DD-<slug>.md`:
+   ```
+   ---
+   date: YYYY-MM-DD
+   type: learning
+   project: "[[<P>]]"
+   tags: [learning, <P>]
+   related-task: "[[T-XXX]]"   # if known
+   ai-first: true
+   ---
+
+   ## For future Claude
+   [one-line summary of what was learned + why future-Claude would care]
+
+   ## What I learned
+   [the lesson, 2-4 sentences]
+
+   ## How I learned it
+   [the trigger — a bug, a successful pattern, a colleague's comment]
+
+   ## When this applies
+   [pattern recognition — what situations will hit this again]
+
+   ## Source
+   [task / spec / commit SHA]
+   ```
+4. Append a one-line entry to today's `Logs/YYYY-MM-DD.md`: `**HH:MM** - learn-capture | <P>/<slug> - <one-line>`
+5. STOP. Do not run review mode.
+
+### Review mode (no `--capture` flag — default, original behavior)
+
+The existing numbered steps below apply unchanged. They survey the vault.
+
+## Project routing
+
+For capture mode: resolve project name in priority: (1) `--project=<name>` in `$ARGUMENTS`; (2) vault `_CLAUDE.md` active project; (3) codebase CLAUDE.md. If none resolves: ASK — never default.
+
+Target (capture mode): `Projects/<P>/Learnings/YYYY-MM-DD-<slug>.md`
 
 1. Read `_CLAUDE.md` first if it exists in the vault root
 2. Read `index.md` and recent operation log for vault context (if `Logs/` exists: read the last 2-3 `Logs/YYYY-MM-DD.md` files; otherwise read `log.md`)
