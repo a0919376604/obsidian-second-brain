@@ -44,9 +44,17 @@ To locate the codebase for `--refresh`: read `Projects/<name>/<name>.md` frontma
    - **PRESERVE** these sections from the existing file (do not overwrite):
      - `## For future Claude` preamble
      - Frontmatter (just update `last-refresh:` timestamp and totals)
-     - `## 🔥 This Week` section (manually maintained)
+     - `## 🔥 This Week` section (manually maintained Now/Next/Later overlay)
+     - `## 待辦` / `## 進行中` / `## 已完成` synthesis sections (if user has manually customized them; if they look auto-synthesized — see SYNTHESIZE rule below — re-synthesize on each refresh)
      - `## Patterns observed` section, if present (only re-compute totals)
      - `## Bucket summary` table (recompute counts)
+   - **SYNTHESIZE if missing** — if any of `## 🔥 This Week`, `## 待辦`, `## 進行中`, `## 已完成` sections do NOT exist in the current board, ADD them at the top (after the preamble + horizontal rule, before the first topic bucket). Synthesize content from the regenerated topic buckets:
+     - `## 🔥 This Week → Now (≤3)`: pick the 1–3 highest-priority In Progress items across all topic buckets (priority signal: most recent commit activity, or topic-bucket recency)
+     - `## 🔥 This Week → Next`: items with a spec but no impl commits yet (effectively the first Backlog → Next promotion)
+     - `## 🔥 This Week → Later`: remaining Backlog items
+     - `## 待辦`: union of all 📋 Backlog from topic buckets (empty placeholder text if none)
+     - `## 進行中`: union of all 🔨 In Progress from topic buckets, each item prefixed with `[<bucket-name>]`
+     - `## 已完成 (本週)`: union of last 7 days of ✅ Done items from topic buckets (date-sorted desc)
    - **REGENERATE** the topic bucket sections (Done / In Progress / Backlog within each)
 7. Append one line to `Logs/YYYY-MM-DD.md`:
    `**HH:MM** - board | <name> refreshed - N done, M in-flight, P backlog across K buckets`
