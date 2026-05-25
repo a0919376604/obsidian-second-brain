@@ -18,9 +18,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **New free-source clients** under `scripts/research/lib/sources/`: arxiv, semantic_scholar, openalex, crossref, duckduckgo, wikipedia, hackernews, reddit, lobsters, devto.
 - **File-based cache** at `~/.cache/obsidian-second-brain/research/` with 24h default TTL.
 - **`~/.config/obsidian-second-brain/research.toml`** for `contact_email` + SearXNG instance list + rate-limit overrides.
+- Plan 1 implementation reference: `docs/superpowers/plans/2026-05-25-vault-hybrid-foundation.md`.
 
 ### Changed
 
+- **Project-scoped vault routing**: 14 slash commands now accept `--project=<name>` and route writes to `Projects/<name>/{Ideas,Tasks,Decisions,Learnings,Research,Recaps}/` sub-folders. Without the flag, default behavior is preserved (writes to vault root). See `docs/superpowers/specs/2026-05-25-vault-hybrid-architecture-and-pipeline-design.md` for the design rationale.
+- **`/obsidian-adr` retargeted**: ADRs now write to `Projects/<P>/Decisions/` (was `Knowledge/ADR-...`). Aligns with industry convention. ADR template now includes "What would change my mind" field.
+- **`/obsidian-learn` gains `--capture` mode**: write a single learning at the moment of insight (Checkpoint 3 in the spec). The original review-mode is still the default.
+- **`/obsidian-board` gains `--refresh` mode**: regenerates the board from codebase git log + spec/plan scan + bucket classification. Preserves manual sections (`## 🔥 This Week`, `## For future Claude` preamble, frontmatter).
+- **`/obsidian-graduate` and `/obsidian-project`**: create projects in sub-folder layout (`Projects/<name>/<name>.md` + sub-folder skeleton) instead of flat `Projects/<name>.md`.
 - **Research toolkit no longer requires paid APIs.** All 7 research commands now run on free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is performed by the calling Claude session instead of an external LLM API.
 
 ### Renamed
