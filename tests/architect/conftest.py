@@ -6,6 +6,8 @@ import pytest
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
+collect_ignore_glob = ["fixtures/*/tests/*.py"]
+
 
 @pytest.fixture
 def single_lang_python() -> Path:
