@@ -117,3 +117,52 @@ def test_split_dense_folder_with_multiple_entry_points(tmp_path: Path):
     # Expect at least a split proposal (two sub-modules or marker telling caller to split).
     # For v1 implementation we simply tag the module dict with split_hint: True.
     assert out[0].get("split_hint") is True
+
+
+def test_dependency_and_runtime_dirs_are_excluded(tmp_path: Path):
+    """Folders that hold deps, build output, runtime data, or test-coverage
+    artefacts should appear as excluded modules (so overview can still
+    reference them), never as active modules with their own note.
+
+    Regression test for the langlive-line-oa scan where node_modules,
+    logs, reports leaked through as active modules.
+    """
+    # Real source folder we want kept.
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("x = 1\n")
+
+    # Folders that should be excluded.
+    excluded_folders = [
+        "node_modules",   # JS deps
+        "vendor",         # Go / PHP deps
+        "venv",           # python deps
+        "env",            # python deps
+        "logs", "log",    # runtime logs
+        "reports",        # runtime reports
+        "tmp",            # scratch
+        "coverage",       # test coverage output
+        ".nyc_output",    # nyc coverage output (hidden — already filtered earlier, but listed for safety)
+    ]
+    for name in excluded_folders:
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "marker.txt").write_text("x")
+
+    modules = propose_modules(tmp_path)
+    by_slug = {m["slug"]: m for m in modules}
+
+    # src is a real module.
+    assert "src" in by_slug, "src/ should appear as a real module"
+    assert by_slug["src"]["excluded"] is False
+
+    # Each non-hidden folder above should appear (slugified) with excluded=True.
+    # Hidden folders (starting with .) are filtered out entirely upstream — they
+    # never become module candidates, so we do not assert their presence.
+    expected_excluded_slugs = {
+        "node-modules", "vendor", "venv", "env",
+        "logs", "log", "reports", "tmp", "coverage",
+    }
+    for slug in expected_excluded_slugs:
+        assert slug in by_slug, f"{slug} should appear as a module entry"
+        assert by_slug[slug]["excluded"] is True, (
+            f"{slug} should be excluded (dependency/runtime/build dir)"
+        )

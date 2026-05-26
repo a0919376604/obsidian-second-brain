@@ -16,12 +16,29 @@ from pathlib import Path
 
 # Folders that become modules with excluded=True. They show up in
 # overview narrative but no per-module note is generated.
+#
+# Principle: anything that is not source code belongs here. The walker
+# filters most of these from file traversal already, but proposal.py
+# still sees the folder exists at the top level and would otherwise emit
+# a module entry. We mark them excluded so the overview can still mention
+# them (e.g. "this repo ships docs/ and tests/") without spawning a note.
 SKIP_AS_MODULE = {
+    # Tests
     "tests", "test", "__tests__", "spec",
+    # Docs
     "docs", "documentation",
+    # Examples
     "examples", "example",
-    ".github",
-    "dist", "build", "target", "out",
+    # CI config (hidden folders are filtered earlier; listed for explicitness)
+    ".github", ".gitlab",
+    # Build output
+    "dist", "build", "target", "out", "bin", "obj",
+    # Dependency directories (sometimes checked in, e.g. node_modules in lockfile-less repos)
+    "node_modules", "vendor", "venv", "env", "virtualenv",
+    # Runtime data
+    "logs", "log", "reports", "tmp", "temp", "cache",
+    # Test coverage artefacts
+    "coverage", "htmlcov", ".nyc_output",
 }
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
