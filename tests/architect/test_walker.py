@@ -27,3 +27,21 @@ def test_walk_repo_excludes_gitignored(single_lang_python: Path, tmp_path: Path)
 def test_walk_repo_skips_binary_and_dot_git(single_lang_python: Path):
     files = walk_repo(single_lang_python)
     assert not any(f.startswith(".git/") for f in files)
+
+from scripts.architect.walker import language_stats, git_metadata
+
+
+def test_language_stats_returns_counts_by_extension(single_lang_python: Path):
+    stats = language_stats(single_lang_python)
+    # stats is a list of dicts: [{"lang": "python", "files": N, "tokens": T}, ...]
+    by_lang = {row["lang"]: row for row in stats}
+    assert "python" in by_lang
+    assert by_lang["python"]["files"] >= 5
+    # Tokens are approximate via len(text) // 4 heuristic.
+    assert by_lang["python"]["tokens"] > 0
+
+
+def test_git_metadata_returns_commit_and_dirty(single_lang_python: Path):
+    meta = git_metadata(single_lang_python)
+    assert len(meta["commit"]) == 40  # full SHA
+    assert meta["dirty"] is False
