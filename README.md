@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/eugeniughelbur/obsidian-second-brain">
-    <img src="media/banner.png" alt="obsidian-second-brain — one brain, four CLIs, 33 commands. A cross-CLI skill for Obsidian that runs on Claude Code, Codex CLI, Gemini CLI, and OpenCode." width="100%" />
+    <img src="media/banner.png" alt="obsidian-second-brain — one brain, four CLIs, 34 commands. A cross-CLI skill for Obsidian that runs on Claude Code, Codex CLI, Gemini CLI, and OpenCode." width="100%" />
   </a>
 </p>
 
@@ -34,14 +34,14 @@
   <br /><br />
   <em>Every source updates existing pages instead of just appending new ones. Contradictions reconcile automatically. Your vault compounds while you sleep.</em>
   <br /><br />
-  <em>33 commands &middot; auto-synthesis &middot; thinking tools that argue with you</em>
+  <em>34 commands &middot; auto-synthesis &middot; thinking tools that argue with you</em>
   <br /><br />
   <em>live research from X, the web, and YouTube &middot; 4 scheduled agents &middot; 4 role presets</em>
   <br /><br />
   <em>write-time AI-first validator &middot; <code>/create-command</code> interview flow &middot; multilingual trigger schema</em>
   <br /><br />
   <a href="#what-happens-when-you-install-this">See it in action</a> &middot;
-  <a href="#33-commands">All commands</a> &middot;
+  <a href="#34-commands">All commands</a> &middot;
   <a href="#install">Install</a> &middot;
   <a href="#choose-your-preset">Presets</a> &middot;
   <a href="https://github.com/eugeniughelbur/obsidian-second-brain/discussions">Discussions</a>
@@ -216,7 +216,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 ```
   +------------------------------------------+
   |                                          |
-  |   LAYER 1: Operations (21 commands)      |
+  |   LAYER 1: Operations (22 commands)      |
   |   Claude remembers everything            |
   |                                          |
   +------------------------------------------+
@@ -251,7 +251,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 
 ---
 
-## 33 Commands
+## 34 Commands
 
 ### Operations -- Claude remembers
 
@@ -273,6 +273,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 | `/obsidian-review` | Structured weekly or monthly review |
 | `/obsidian-board` | Kanban board view and updates |
 | `/obsidian-project` | Project note with board and daily links |
+| `/obsidian-architect <repo>` | Scan a codebase and generate architecture overview + module notes into the project hub |
 | `/obsidian-health` | Vault audit -- contradictions, gaps, stale claims, orphans |
 | `/obsidian-adr` | Decision records -- the vault knows why it's structured this way |
 | `/obsidian-visualize` | Generates a visual canvas map — see the shape of your second brain |
@@ -622,7 +623,7 @@ Sources used (all free, no API keys):
 | HackerNews, Reddit, Lobsters, dev.to | `/research`, `/research-deep`, `/discourse-pulse`, `/thread-read` |
 | youtube-transcript-api + page scrape | `/youtube` |
 
-The existing 27 vault commands need no Python at all - they're pure markdown commands. The research toolkit is the only layer that touches the network.
+Most vault commands need no Python at all - they're pure markdown commands. `/obsidian-architect` and the research toolkit use Python helpers for scanning and external-source retrieval.
 
 ---
 
@@ -641,13 +642,13 @@ An Obsidian plugin runs inside Obsidian and is written in TypeScript against Obs
 Run the one-line installer from the Install section below. It clones the repo to `~/.claude/skills/obsidian-second-brain` and symlinks the slash commands into `~/.claude/commands/` so Claude Code picks them up automatically. Restart Claude Code after install. The skill loads on every session that touches an Obsidian vault.
 
 ### Does this work with Codex CLI, Gemini CLI, or OpenCode?
-Yes. The repo ships a build script that compiles the platform-neutral source into four platform-specific outputs: Claude Code (slash commands + `CLAUDE.md`), Codex CLI (`AGENTS.md` + `.codex/commands/`), Gemini CLI (`GEMINI.md` + `.gemini/commands/`), and OpenCode (`AGENTS.md` + `.opencode/commands/`). Run `bash scripts/build.sh --platform codex-cli` (or another platform name), then copy the resulting `dist/<platform>/` tree into your vault. The non-Claude builds auto-generate a routing table that maps natural-language triggers to command files, so the same 32 commands work no matter which CLI you use. The vault rules (AI-first notes, frontmatter, wikilinks, recency markers) are identical across all four platforms.
+Yes. The repo ships a build script that compiles the platform-neutral source into four platform-specific outputs: Claude Code (slash commands + `CLAUDE.md`), Codex CLI (`AGENTS.md` + `.codex/commands/`), Gemini CLI (`GEMINI.md` + `.gemini/commands/`), and OpenCode (`AGENTS.md` + `.opencode/commands/`). Run `bash scripts/build.sh --platform codex-cli` (or another platform name), then copy the resulting `dist/<platform>/` tree into your vault. The non-Claude builds auto-generate a routing table that maps natural-language triggers to command files, so the same 34 commands work no matter which CLI you use. The vault rules (AI-first notes, frontmatter, wikilinks, recency markers) are identical across all four platforms.
 
 ### Does this work with Obsidian Sync?
 Yes. The skill writes to your vault as standard markdown files. Obsidian Sync, iCloud, Syncthing, and Git-based sync all work without modification.
 
 ### Do I need API keys to use this?
-No. The entire skill works with zero API keys. The 27 vault commands have always been pure markdown. As of v1.0, the 7 research commands (`/research`, `/research-deep`, `/discourse-pulse`, `/thread-read`, `/youtube`, `/idea-discovery`, `/vault-deep-synthesis`) also run on free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is done by the calling Claude session.
+No. The entire skill works with zero API keys. The vault commands do not require external API keys. As of v1.0, the 7 research commands (`/research`, `/research-deep`, `/discourse-pulse`, `/thread-read`, `/youtube`, `/idea-discovery`, `/vault-deep-synthesis`) also run on free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is done by the calling Claude session.
 
 ### How is this different from Notion AI or Mem?
 Notion AI and Mem are closed-source SaaS products that own your data. This skill stores everything as plain markdown in your local Obsidian vault, with no vendor lock-in. The AI is on top of your data, not behind it. You can switch tools or stop using the skill at any point and still have your full vault.

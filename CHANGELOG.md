@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `/obsidian-architect <repo-path>` slash command: scans a codebase and generates
+  an architecture overview plus per-module notes into the project hub at
+  `Projects/<P>/Architecture/`. Diff-aware refresh preserves user edits via
+  `@generated`/`@user` sentinels and a lockfile. Module identity is pinned via
+  a user-editable `_manifest.yml`. Supports local repos and remote GitHub URLs
+  (via `repomix --remote`), plus `--project=<P>` for multi-repo projects.
+- `scripts/architect/` Python package: deterministic Phase 1 scanner (file tree
+  walker, language stats, entry-point detection, dep extraction, module proposal
+  heuristics, manifest read/write, lockfile, sentinel parser, refresh decision).
+- `references/ai-first-rules.md`: documented three new `type:` values:
+  `architecture-overview`, `architecture-module`, `architecture-data-flow`.
 - **SessionStart hook (`hooks/load_vault_context.py`):** injects `_CLAUDE.md` into context once per session when the session starts inside the vault. Eliminates the per-command re-read of `_CLAUDE.md` that burned tokens on every invocation. Wired automatically by `scripts/setup.sh`.
 - **`scripts/setup.sh` updated:** wires the new SessionStart hook (`hooks/load_vault_context.py`) in addition to the existing PostCompact background agent.
 - **Per-day operation logs:** `/obsidian-init` now creates a `Logs/` folder with per-day files (`Logs/YYYY-MM-DD.md`) instead of a monolithic `log.md`. Root `log.md` becomes a pointer file only. Cheaper to read, faster to query.
@@ -31,6 +42,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **`/obsidian-board` gains `--refresh` mode**: regenerates the board from codebase git log + spec/plan scan + bucket classification. Preserves manual sections (`## 🔥 This Week`, `## For future Claude` preamble, frontmatter).
 - **`/obsidian-graduate` and `/obsidian-project`**: create projects in sub-folder layout (`Projects/<name>/<name>.md` + sub-folder skeleton) instead of flat `Projects/<name>.md`.
 - **Research toolkit no longer requires paid APIs.** All 7 research commands now run on free, key-less sources (arXiv, Semantic Scholar, OpenAlex, CrossRef, DuckDuckGo, Wikipedia, HackerNews, Reddit, Lobsters, dev.to). Synthesis is performed by the calling Claude session instead of an external LLM API.
+
+### Dependencies
+
+- Added `pyyaml>=6.0.1` (manifest serialization) and `pathspec>=0.12.1`
+  (`.gitignore` matching) to runtime deps.
+- Optional: `repomix` (npm package) for repo packing. Python fallback exists
+  but is about 3x slower.
 
 ### Renamed
 
