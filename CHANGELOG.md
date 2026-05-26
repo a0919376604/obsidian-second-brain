@@ -19,6 +19,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   heuristics, manifest read/write, lockfile, sentinel parser, refresh decision).
 - `references/ai-first-rules.md`: documented three new `type:` values:
   `architecture-overview`, `architecture-module`, `architecture-data-flow`.
+
+### Fixed
+
+- **architect: deps and runtime dirs leaked through as active modules.** Surfaced
+  while scanning a real Node + Python repo: `node_modules/`, `logs/`, `reports/`,
+  `coverage/`, `vendor/` and similar dirs ended up in the proposed manifest with
+  `excluded: false`. The walker correctly skipped their files during traversal,
+  but `proposal.SKIP_AS_MODULE` was too narrow and still emitted module entries
+  for the top-level folders. Extended `SKIP_AS_MODULE` with the missing
+  categories (deps, runtime data, build output for JVM/.NET, test coverage,
+  GitLab CI) and added a regression test.
+- **architect: silenced 420 `pathspec` `GitWildMatchPattern` deprecation
+  warnings** by switching `PathSpec.from_lines("gitwildmatch", ...)` to
+  `PathSpec.from_lines("gitignore", ...)` in `scripts/architect/walker.py`.
+  Same matcher behaviour, future-proof against pathspec dropping the old name.
+
+### Known limitations (scanner v0.1.0)
+
+Documented behaviours that surfaced during the first real-repo run. Candidates
+for a v1.1 follow-up:
+
+- `primary_language` is token-weighted, so a docs-heavy repo can rank `markdown`
+  (or `html`) above its actual primary code language. Workaround: pin
+  `primary_language` in `_manifest.yml` — refresh respects the pin via the
+  lockfile.
+- External-dependency detector only inspects `pyproject.toml`, `package.json`,
+  `Cargo.toml`, and `go.mod` at the repo root. Nested deps files
+  (e.g. `backend/requirements.txt`, `frontend/package.json` in a two-image
+  monorepo) are missed. Workaround: paste them into the `overview.md`
+  `## External dependencies` block.
+- Entry-point detector matches the exact filename `Dockerfile`. Variants like
+  `Dockerfile.backend` / `Dockerfile.frontend` are not picked up. `python -m
+  <pkg>` style entry points are also not detected unless declared in
+  `[project.scripts]`. Workaround: same as above.
+
 - **SessionStart hook (`hooks/load_vault_context.py`):** injects `_CLAUDE.md` into context once per session when the session starts inside the vault. Eliminates the per-command re-read of `_CLAUDE.md` that burned tokens on every invocation. Wired automatically by `scripts/setup.sh`.
 - **`scripts/setup.sh` updated:** wires the new SessionStart hook (`hooks/load_vault_context.py`) in addition to the existing PostCompact background agent.
 - **Per-day operation logs:** `/obsidian-init` now creates a `Logs/` folder with per-day files (`Logs/YYYY-MM-DD.md`) instead of a monolithic `log.md`. Root `log.md` becomes a pointer file only. Cheaper to read, faster to query.

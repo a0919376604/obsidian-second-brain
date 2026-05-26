@@ -34,9 +34,9 @@ def _load_gitignore(repo_root: Path) -> pathspec.PathSpec:
     """Load .gitignore patterns from the repo root, if present."""
     gitignore = repo_root / ".gitignore"
     if not gitignore.exists():
-        return pathspec.PathSpec.from_lines("gitwildmatch", [])
+        return pathspec.PathSpec.from_lines("gitignore", [])
     with gitignore.open() as fh:
-        return pathspec.PathSpec.from_lines("gitwildmatch", fh)
+        return pathspec.PathSpec.from_lines("gitignore", fh)
 
 
 def _is_binary(path: Path) -> bool:

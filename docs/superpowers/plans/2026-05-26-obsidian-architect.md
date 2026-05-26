@@ -3166,3 +3166,107 @@ Run through this once after the plan is complete:
 4. **Frequent commits:** every task ends with a commit. 22 commits total (21 numbered + Task 10b).
 
 5. **TDD:** every task with code starts with the failing test step.
+
+---
+
+## Execution log
+
+Captured 2026-05-26 after the plan ran end-to-end via `/run-plan` (codex exec)
+followed by an interactive Task 21. This log records what actually happened vs
+what the plan said, so future Claude can reconcile the two without surprise.
+
+### Codex run (PID 83920, ~25 min, high reasoning)
+
+Status: **DONE_WITH_CONCERNS**. All 22 numbered tasks plus Task 10b produced
+commits on `main` (start ref `6a9cac0`, end ref `c4d3762`). Tests: 42 architect
++ 81 total at exit, all green. Build all four adapter platforms clean. Dry-run
+against the host repo produced 11 sensible module candidates.
+
+Three reasonable deviations from the plan, all noted by codex:
+
+1. **Task 2 nested git fixture.** The plan said "git automatically filters
+   nested `.git/` directories" when committing a fixture repo to the host repo.
+   On this machine that turned the fixture into a gitlink (submodule pointer)
+   instead of plain files. Codex landed a corrective commit (`1d96d10`) that
+   re-added the fixture files as regular blobs. Plan still works as a recipe,
+   but the "filtered automatically" line should be amended to: "remove the
+   fixture's inner `.git/` before `git add`, or use `git add --all` from the
+   fixture root after committing inside it."
+
+2. **Task 10b merge heuristic guard.** The plan's merge heuristic ("sibling
+   folders sharing a primary language and each below 2000 tokens get merged")
+   would, applied to the `single-lang-python` fixture, collapse `auth/`, `db/`,
+   `api/` into a single module — contradicting the Task 9 tests that assert
+   each appears separately. Codex added a `_merge_family()` slug-prefix guard
+   so two modules only merge when their slug families match
+   (`re.split(r"[-_]", slug, maxsplit=1)[0]`). This is strictly more
+   conservative than the plan and is the correct call.
+
+3. **CLI `sys.path` bootstrap.** `scripts/architect_scan.py` needed an
+   explicit `sys.path` insertion at the top so `python scripts/architect_scan.py
+   ...` (no `-m` wrapper) can import `scripts.architect`. Plan didn't include
+   it. Codex added it in commit `a6c0e9d`.
+
+### Post-codex fix (this conversation)
+
+Running the command against a real Node + Python repo (`langlive-line-oa`)
+surfaced a real bug in `proposal.SKIP_AS_MODULE`: `node_modules/`, `logs/`,
+`reports/`, `coverage/`, `vendor/` and similar leaked through as active
+modules. The walker correctly skipped their files but the top-level folders
+still became module entries.
+
+Fixed in commit `fa36444`. Regression test
+`test_dependency_and_runtime_dirs_are_excluded` added. Plan's Task 9 spec for
+`SKIP_AS_MODULE` is now superseded by the longer list in `proposal.py`.
+
+### Task 21 manual verification (interactive, this conversation)
+
+Executed against `langlive-line-oa` (the only existing project hub in the
+target vault). Real notes written to
+`/Users/leric/Documents/SecondBrain/Projects/langlive-line-oa/Architecture/`:
+`_manifest.yml`, `_manifest.lock.json`, `scan-report.json`, `overview.md`,
+plus five module notes (backend, frontend, modules, services, scripts). Hub
+note updated with `## Architecture` section. New
+`/Users/leric/Documents/SecondBrain/Logs/2026-05-26.md` created with the
+operation log line.
+
+Verification results (all passing):
+
+- **Sentinel preservation (Step 2):** 3/3. Edited the `what-it-does`
+  `@generated` body in `backend.md` → hash mismatch detected, refresh would
+  overwrite. Added a `<!-- @user:start notes -->` block → would be preserved
+  forever. Edited plain-text content outside any sentinel ("For future Claude"
+  preamble) → user-edit detected, refresh would preserve and emit a warning.
+- **Manifest pinning (Step 3):** 4/4. Pinned `repo.primary_language: python`,
+  pinned `modules.backend.display_name`, pinned `modules.frontend.role:
+  surface`, added a user `description` to backend. Re-ran scanner; lockfile
+  hash compare correctly classified each: three preserved as user-edited, one
+  unchanged-by-user field correctly identified as LLM-territory.
+- **Dry-run (Step 4):** `--dry-run` printed 172 KB of JSON to stdout, zero
+  vault writes. Verified by file-newer-than-snapshot check.
+- **Full test suite (Step 5):** 82 passed (43 architect + 39 research).
+
+### Known scanner v0.1.0 limitations (deferred to v1.1)
+
+Documented in `CHANGELOG.md` under "Known limitations". Three real-repo issues
+that aren't bugs but degrade scan quality on certain repo shapes:
+
+1. **Token-weighted `primary_language`** ranks `markdown` / `html` above the
+   real code language when a repo is docs-heavy or template-heavy. Workaround:
+   pin in manifest.
+2. **External-dependency detector is root-only.** Nested deps files
+   (`backend/requirements.txt`, `frontend/package.json` in two-image monorepos)
+   are missed.
+3. **Entry-point detector matches the exact filename `Dockerfile`.**
+   `Dockerfile.backend` / `Dockerfile.frontend` and `python -m <pkg>` style
+   entry points are not detected.
+
+Each is one small, focused change. Worth bundling into a v1.1 patch when there
+is appetite.
+
+### Polish committed in this conversation
+
+- `fa36444` — fix(architect): mark deps/runtime/build dirs as excluded modules
+- (this commit) — fix(architect): switch pathspec `gitwildmatch` →
+  `gitignore` matcher to silence the 420-warning deprecation flood; CHANGELOG
+  updated with Fixed + Known limitations sections; this execution log appended.
