@@ -57,3 +57,63 @@ def test_docs_only_warning_signal(docs_only_repo: Path):
     # "mostly docs" warning is emitted by scan.py, not proposal.py.
     slugs = [m["slug"] for m in modules]
     assert "scripts" in slugs
+
+from scripts.architect.proposal import _merge_small_siblings, _split_dense_folder
+
+
+def test_merge_small_siblings_combines_two_tiny_python_folders(tmp_path: Path):
+    # Build a tiny synthetic repo: two sibling folders, both small, same language.
+    (tmp_path / "small_a").mkdir()
+    (tmp_path / "small_a" / "x.py").write_text("def a(): return 1\n")
+    (tmp_path / "small_b").mkdir()
+    (tmp_path / "small_b" / "y.py").write_text("def b(): return 2\n")
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='t'\nversion='0.1'\n")
+
+    base = [
+        {"slug": "small-a", "display_name": "Small A", "paths": ["small_a/"],
+         "role": "other", "excluded": False, "description": None, "pattern": None},
+        {"slug": "small-b", "display_name": "Small B", "paths": ["small_b/"],
+         "role": "other", "excluded": False, "description": None, "pattern": None},
+    ]
+    merged = _merge_small_siblings(tmp_path, base)
+    # Expect a single merged module covering both folders.
+    assert len(merged) == 1
+    assert sorted(merged[0]["paths"]) == ["small_a/", "small_b/"]
+
+
+def test_merge_keeps_large_modules_separate(tmp_path: Path):
+    # Folder A is big enough not to merge.
+    (tmp_path / "big").mkdir()
+    (tmp_path / "big" / "f.py").write_text("x = 1\n" * 600)  # well over 2000 tokens
+    (tmp_path / "small").mkdir()
+    (tmp_path / "small" / "g.py").write_text("y = 2\n")
+
+    base = [
+        {"slug": "big", "display_name": "Big", "paths": ["big/"],
+         "role": "other", "excluded": False, "description": None, "pattern": None},
+        {"slug": "small", "display_name": "Small", "paths": ["small/"],
+         "role": "other", "excluded": False, "description": None, "pattern": None},
+    ]
+    out = _merge_small_siblings(tmp_path, base)
+    assert len(out) == 2  # untouched
+
+
+def test_split_dense_folder_with_multiple_entry_points(tmp_path: Path):
+    # Build a folder with 35 files and two entry-point-like markers.
+    fold = tmp_path / "dense"
+    fold.mkdir()
+    for i in range(35):
+        (fold / f"f{i}.py").write_text("x = 1\n")
+    (fold / "cli_a.py").write_text("def main_a(): pass\n")
+    (fold / "cli_b.py").write_text("def main_b(): pass\n")
+
+    base = [{"slug": "dense", "display_name": "Dense", "paths": ["dense/"],
+             "role": "other", "excluded": False, "description": None, "pattern": None}]
+    entry_points = [
+        {"path": "dense/cli_a.py", "label": "ep_a", "kind": "pyproject"},
+        {"path": "dense/cli_b.py", "label": "ep_b", "kind": "pyproject"},
+    ]
+    out = _split_dense_folder(tmp_path, base, entry_points)
+    # Expect at least a split proposal (two sub-modules or marker telling caller to split).
+    # For v1 implementation we simply tag the module dict with split_hint: True.
+    assert out[0].get("split_hint") is True
