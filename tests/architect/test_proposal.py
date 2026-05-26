@@ -25,3 +25,35 @@ def test_role_defaults_to_other(single_lang_python: Path):
     for m in modules:
         if not m["excluded"]:
             assert m["role"] in {"surface", "core", "adapter", "infra", "data", "docs", "other"}
+
+from scripts.architect.proposal import propose_modules_with_heuristics
+
+
+def test_flat_repo_fallback(flat_repo: Path):
+    modules = propose_modules_with_heuristics(flat_repo)
+    slugs = [m["slug"] for m in modules]
+    # Flat layout produces a single "core" module covering the root.
+    assert "core" in slugs
+
+
+def test_monorepo_workspaces(monorepo_pnpm: Path):
+    modules = propose_modules_with_heuristics(monorepo_pnpm)
+    slugs = sorted(m["slug"] for m in modules)
+    assert "web" in slugs
+    assert "api" in slugs
+
+
+def test_polyglot_proposal(polyglot_repo: Path):
+    modules = propose_modules_with_heuristics(polyglot_repo)
+    slugs = sorted(m["slug"] for m in modules if not m["excluded"])
+    # python/, web/, scripts/ are top-level
+    assert "python" in slugs
+    assert "web" in slugs
+
+
+def test_docs_only_warning_signal(docs_only_repo: Path):
+    modules = propose_modules_with_heuristics(docs_only_repo)
+    # docs/ excluded, scripts/ kept. Function still returns modules; the
+    # "mostly docs" warning is emitted by scan.py, not proposal.py.
+    slugs = [m["slug"] for m in modules]
+    assert "scripts" in slugs
