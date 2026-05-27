@@ -265,6 +265,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 | `/obsidian-daily` | Creates or updates today's daily note |
 | `/obsidian-log` | Logs a work session, links it everywhere |
 | `/obsidian-task` | Adds task to the right board with priority and due date |
+| `/obsidian-roadmap` | Synthesize Architecture signals + Research into Roadmap.md + Tasks + board cards. 5-phase pipeline with batch review. |
 | `/obsidian-person` | Creates or updates a person note |
 | `/obsidian-decide` | Logs decisions to the right project note |
 | `/obsidian-capture` | Zero-friction idea capture |

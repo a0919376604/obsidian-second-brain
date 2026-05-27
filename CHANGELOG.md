@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `/obsidian-roadmap <project>` — synthesize a project Roadmap.md plus
+  Tasks/T-NNN-*.md plus board cards from Architecture/ signals
+  (future.md, decisions.md "Promote to ADR", roadmap.md TODO clusters)
+  and accumulated Research/ (project-scoped + recent vault-wide). New
+  `type: roadmap` schema lives at `Projects/<P>/Roadmap.md` (separate
+  from `architecture-roadmap` under `Architecture/`). `_roadmap.lock.json`
+  tracks theme + task materialization for idempotent re-runs.
+- 5-phase pipeline: Phase 1 deterministic gap detection, Phase 2 two-stage
+  research matching (keyword prefilter + LLM relevance), Phase 3 single
+  LLM call producing fully-spec'd themes, Phase 4 batch markdown table
+  review (K/D/M/E actions), Phase 5 deterministic file write.
+- `type: task` gains two optional fields: `roadmap-theme` (links back to
+  a Roadmap.md theme) and `created-by` (provenance marker).
 - `/obsidian-architect <repo-path>` slash command: scans a codebase and generates
   an architecture overview plus per-module notes into the project hub at
   `Projects/<P>/Architecture/`. Diff-aware refresh preserves user edits via
