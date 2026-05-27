@@ -1,23 +1,27 @@
 """Phase 1 orchestrator: tie walker + repomix + entry_points + deps + proposal
-into a single deterministic output.
-
-This is the public surface called by scripts/architect_scan.py CLI.
+plus narrative-signal detectors into a single deterministic output.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 
+from scripts.architect.adr import discover_decision_docs
+from scripts.architect.api_surface import detect_api_surface
+from scripts.architect.changelog import load_changelog
 from scripts.architect.deps import detect_external_deps
 from scripts.architect.entry_points import detect_entry_points
 from scripts.architect.manifest import Manifest
 from scripts.architect.proposal import propose_modules_with_heuristics
+from scripts.architect.readme import extract_sections
 from scripts.architect.repomix import pack_repo_metadata
+from scripts.architect.stack import detect_stack
+from scripts.architect.todos import aggregate_todos
 from scripts.architect.walker import git_metadata, language_stats, walk_repo
 
-SCANNER_VERSION = "0.1.0"
+SCANNER_VERSION = "0.2.0"
 
 
 @dataclass
@@ -27,7 +31,6 @@ class ScanResult:
 
 
 def run_phase_one(repo_root: Path) -> ScanResult:
-    """Run Phase 1 end-to-end. No vault writes; returns in-memory result."""
     repo_root = repo_root.resolve()
 
     files = walk_repo(repo_root)
@@ -57,6 +60,19 @@ def run_phase_one(repo_root: Path) -> ScanResult:
         modules=modules,
     )
 
+    # Narrative signal collection.
+    readme_text = (repo_root / "README.md").read_text(encoding="utf-8") if (repo_root / "README.md").exists() else ""
+    readme_sections = extract_sections(readme_text)
+    changelog = load_changelog(repo_root)
+    decision_docs = [asdict(d) for d in discover_decision_docs(repo_root)]
+    stack = detect_stack(repo_root)
+    module_paths_map = {m["slug"]: m.get("paths", []) for m in modules}
+    todos = {
+        slug: [asdict(t) for t in items]
+        for slug, items in aggregate_todos(repo_root, module_paths_map).items()
+    }
+    api_surface = detect_api_surface(repo_root)
+
     scan_report = {
         "files": files,
         "languages": languages,
@@ -65,6 +81,32 @@ def run_phase_one(repo_root: Path) -> ScanResult:
         "pack_metadata": pack_meta,
         "git": git_meta,
         "scanner_version": SCANNER_VERSION,
+        # Narrative additions.
+        "readme_sections": readme_sections,
+        "changelog": _changelog_to_dict(changelog),
+        "decision_docs": decision_docs,
+        "stack": stack,
+        "todos": todos,
+        "api_surface": _api_surface_to_dict(api_surface),
     }
 
     return ScanResult(manifest=manifest, scan_report=scan_report)
+
+
+def _changelog_to_dict(cl) -> dict:
+    if cl is None:
+        return {"unreleased": None, "recent_versions": []}
+    return {
+        "unreleased": cl.unreleased,
+        "recent_versions": [asdict(v) for v in cl.recent_versions],
+    }
+
+
+def _api_surface_to_dict(surf) -> dict:
+    return {
+        "cli_commands": [asdict(c) for c in surf.cli_commands],
+        "http_routes": [asdict(r) for r in surf.http_routes],
+        "exports": [asdict(e) for e in surf.exports],
+        "env_vars": [asdict(v) for v in surf.env_vars],
+        "detection_status": surf.detection_status,
+    }
