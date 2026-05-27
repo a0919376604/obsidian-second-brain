@@ -185,3 +185,31 @@ def compose_task_note(
 def format_board_card(task: Task, theme_slug: str, priority: str) -> str:
     """Single line appended to board.md ## 待辦 section."""
     return f"- [ ] [[Tasks/{task.id}-{task.slug}|{task.description}]] {priority} [theme: {theme_slug}]"
+
+
+import re as _re
+import hashlib as _hashlib
+
+_VALID_SLUG_RE = _re.compile(r"^[a-z0-9][a-z0-9-]{0,49}$")
+_NON_SLUG_CHARS = _re.compile(r"[^a-z0-9-]+")
+_MULTI_HYPHEN = _re.compile(r"-{2,}")
+
+
+def normalize_slug(raw: str, max_len: int = 50) -> str:
+    """Return an ascii-lowercase-hyphen slug.
+
+    - If already valid (matches `[a-z0-9][a-z0-9-]{0,49}`), return as-is.
+    - Otherwise lowercase + replace non-ascii-slug chars with hyphen + collapse.
+    - If the result is empty (e.g. all-non-ASCII input), fall back to
+      `task-<short-hash>` so the filename is still legal.
+    """
+    s = raw.strip().lower()
+    if _VALID_SLUG_RE.match(s):
+        return s[:max_len]
+    # Collapse: replace any run of non-slug chars with single hyphen.
+    s = _NON_SLUG_CHARS.sub("-", s)
+    s = _MULTI_HYPHEN.sub("-", s).strip("-")
+    if not s:
+        h = _hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8]
+        return f"task-{h}"
+    return s[:max_len].rstrip("-")

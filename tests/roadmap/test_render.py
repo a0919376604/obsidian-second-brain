@@ -121,3 +121,30 @@ def test_format_board_card_carries_theme_label():
     assert "[[Tasks/T-007-add-rate-limit|加 rate limit middleware]]" in card
     assert "🔴" in card
     assert "[theme: observability]" in card
+
+
+def test_normalize_slug_keeps_valid():
+    from scripts.roadmap.render import normalize_slug
+    assert normalize_slug("add-engine-adapter-base") == "add-engine-adapter-base"
+    assert normalize_slug("refresh-token-rotation") == "refresh-token-rotation"
+
+
+def test_normalize_slug_falls_back_when_invalid():
+    from scripts.roadmap.render import normalize_slug
+    # Capitalised / spaces / Chinese -> fallback uses description
+    assert normalize_slug("Add Adapter Base") == "add-adapter-base"
+    assert normalize_slug("在 backend 加 EngineAdapter") == "backend-engineadapter"
+
+
+def test_normalize_slug_caps_length():
+    from scripts.roadmap.render import normalize_slug
+    s = normalize_slug("a-" * 50)  # 100 chars
+    assert len(s) <= 50
+
+
+def test_normalize_slug_handles_empty():
+    from scripts.roadmap.render import normalize_slug
+    # All-non-ascii input falls back to hash-based slug
+    s = normalize_slug("一個全中文的任務")
+    assert s.startswith("task-")  # fallback prefix
+    assert len(s) > 5
