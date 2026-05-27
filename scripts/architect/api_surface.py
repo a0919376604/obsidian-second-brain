@@ -73,9 +73,25 @@ def detect_api_surface(repo_root: Path) -> ApiSurface:
     return surf
 
 
+_EXCLUDED_PATH_PARTS = frozenset({
+    ".git", "node_modules",
+    # Python virtualenv conventions — packages here are vendored deps, not surface.
+    ".venv", "venv", "env", "virtualenv",
+    # Build / cache artefacts that often mirror or wrap source.
+    "dist", "build", ".next", ".nuxt", ".turbo", ".cache",
+    "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache",
+    # Vendored deps in some Go / PHP / Ruby layouts.
+    "vendor",
+    # IDE / OS noise.
+    ".idea", ".vscode",
+})
+
+
 def _iter_source_files(repo_root: Path):
     for p in repo_root.rglob("*"):
-        if not p.is_file() or ".git" in p.parts or "node_modules" in p.parts:
+        if not p.is_file():
+            continue
+        if _EXCLUDED_PATH_PARTS.intersection(p.parts):
             continue
         if p.suffix not in _SUPPORTED_EXTS:
             continue

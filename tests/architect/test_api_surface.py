@@ -65,3 +65,31 @@ def test_empty_project_returns_detection_status_none(tmp_path: Path):
     assert surf.detection_status == "none"
     assert surf.cli_commands == []
     assert surf.http_routes == []
+
+
+def test_excludes_venv_node_modules_dist_etc(tmp_path: Path):
+    """Vendored deps and build artefacts must not pollute the surface."""
+    # Real source file with one route.
+    (tmp_path / "app.py").write_text(
+        "from fastapi import FastAPI\napp = FastAPI()\n@app.get('/real')\ndef real(): ...\n"
+    )
+    # Should be ignored — .venv (Python virtualenv).
+    (tmp_path / ".venv" / "lib" / "x").mkdir(parents=True)
+    (tmp_path / ".venv" / "lib" / "x" / "__init__.py").write_text(
+        '__all__ = ["from_venv"]\ndef from_venv(): pass\n'
+    )
+    # Should be ignored — dist (build artefact).
+    (tmp_path / "dist").mkdir()
+    (tmp_path / "dist" / "out.py").write_text(
+        "from fastapi import FastAPI\napp = FastAPI()\n@app.post('/from-dist')\ndef bad(): ...\n"
+    )
+    # Should be ignored — __pycache__.
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "__pycache__" / "junk.py").write_text('__all__ = ["from_cache"]\n')
+    surf = detect_api_surface(tmp_path)
+    paths = [r.path for r in surf.http_routes]
+    assert "/real" in paths
+    assert "/from-dist" not in paths
+    names = [e.symbol for e in surf.exports]
+    assert "from_venv" not in names
+    assert "from_cache" not in names
