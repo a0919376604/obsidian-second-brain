@@ -88,3 +88,19 @@ def test_build_relevance_prompt_lists_candidates_and_matches():
     assert "OAuth is a delegated" in prompt
     # zh-TW prompt should mention 繁體中文 OR be explicit about output language
     assert "繁體中文" in prompt or "zh-TW" in prompt or "Traditional Chinese" in prompt
+
+
+def test_build_keyword_extraction_prompt_lists_candidates_with_text():
+    from scripts.roadmap.research_match import build_keyword_extraction_prompt
+    candidates = {
+        "gap-1": "加 SSO 整合 (stated: AGENTS.md)",
+        "asp-2": "把 AI 引擎抽象成 pluggable adapter",
+    }
+    prompt = build_keyword_extraction_prompt(candidates, output_lang="zh-TW")
+    assert "gap-1" in prompt
+    assert "加 SSO 整合" in prompt
+    assert "asp-2" in prompt
+    # Prompt must explicitly ask for JSON output
+    assert "JSON" in prompt
+    # Must ask for 3-5 keywords per candidate
+    assert "3" in prompt and "5" in prompt

@@ -155,3 +155,27 @@ def build_relevance_prompt(
             lines.append(f"- path: {m.path}")
             lines.append(f"  summary: {m.summary_excerpt[:400]}")
     return "\n".join(lines)
+
+
+def build_keyword_extraction_prompt(candidates: dict[str, str], output_lang: str) -> str:
+    """Build LLM prompt for Phase 2a (keyword extraction).
+
+    Agent invokes LLM with this prompt; expects JSON back: {cand-id: [kw, ...]}.
+    """
+    lang_directive = (
+        "Output keywords in whatever language matches the candidate text "
+        "(English code identifiers stay English; Chinese terms stay Chinese). "
+        "Avoid stop words. Each keyword should be 1-3 tokens."
+    )
+    lines = [
+        "Extract 3-5 short keywords per roadmap candidate, useful for searching "
+        "across research notes.",
+        lang_directive,
+        "",
+        "Return strict JSON: {\"<candidate-id>\": [\"<keyword>\", ...], ...}",
+        "",
+        "Candidates:",
+    ]
+    for cid, text in candidates.items():
+        lines.append(f"- {cid}: {text}")
+    return "\n".join(lines)
