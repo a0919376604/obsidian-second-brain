@@ -207,6 +207,25 @@ def build_prompt(section: str, signal: dict, output_lang: str, project: str) -> 
     return "\n".join(lines)
 
 
+def _repo_yaml_lines(repo_label: str) -> list[str]:
+    """Normalize `repo_label` into safe YAML frontmatter line(s).
+
+    Obsidian's strict YAML parser flags `repo: local: /abs/path` as an invalid
+    property because the unquoted value has an embedded colon. Split into two
+    distinct fields and always quote the value to be safe.
+
+    - "local: <path>" or "/abs/path" -> `local-path: "<path>"`
+    - everything else (URL, repo nickname) -> `repo: "<value>"`
+    """
+    stripped = repo_label.strip()
+    if stripped.startswith("local:"):
+        local_path = stripped[len("local:"):].strip()
+        return [f'local-path: "{local_path}"']
+    if stripped.startswith("/"):
+        return [f'local-path: "{stripped}"']
+    return [f'repo: "{stripped}"']
+
+
 def compose_note(
     *,
     section: str,
@@ -228,7 +247,7 @@ def compose_note(
         f"type: {type_value}",
         f"date: {today}",
         f'project: "[[{project}]]"',
-        f"repo: {repo_label}",
+        *_repo_yaml_lines(repo_label),
         f"last-scanned: {today}",
         f"commit: {commit}",
         f"sources: {json.dumps(signal_sources)}",
@@ -372,7 +391,7 @@ def compose_function_note(
         "type: architecture-function",
         f"date: {today}",
         f'project: "[[{project}]]"',
-        f"repo: {repo_label}",
+        *_repo_yaml_lines(repo_label),
         f"module-slug: {module_slug}",
         f'display-name: "{name}"',
         f'signature: "{signature}"',
@@ -453,7 +472,7 @@ def compose_overview(
         "moc-style: true",
         f"date: {today}",
         f'project: "[[{project}]]"',
-        f"repo: {repo_label}",
+        *_repo_yaml_lines(repo_label),
         f"last-scanned: {today}",
         f"commit: {commit}",
         f"lang: {output_lang}",
@@ -585,22 +604,43 @@ def build_module_prompt(
         "3. EVERY improvement must cite Evidence. If you cannot cite Evidence for an idea, "
         "   DO NOT include that improvement — drop it. We refuse speculative roadmap items.",
         "",
+        "## Bullet density rules (HARD — judge yourself before you ship)",
+        "Every bullet in strengths/weaknesses follows this exact shape:",
+        "  - **Title (≤ 30 chars, noun phrase or 動詞短句).** 1 line clarification (≤ 80 chars).",
+        "    - Evidence: `path:line` | [[wikilink]] | commit `<sha>`",
+        "",
+        "✅ GOOD:",
+        "  - **host-net + announce 避開 127.0.0.1 重導.** Client 透過 announce 拿到真實私網 IP。",
+        "    - Evidence: `services/postgres-redis-lab/docker-compose.yaml`, `bootstrap-redis-cluster.sh`",
+        "",
+        "❌ BAD (this exact pattern broke the v3.0 output — do NOT generate this style):",
+        "  - **Postgres + Redis 共用 `network_mode: host`,讓 announce 設計能套用真實私網 IP** — `services/postgres-redis-lab/docker-compose.yaml` 全部節點 `network_mode: host`,並透過 `REDIS_CLUSTER_ANNOUNCE_HOST` 將遠端可達位址廣告給 client (`services/postgres-redis-lab/scripts/bootstrap-redis-cluster.sh`)。這直接解決了「從 laptop 連線到 server 的 Redis Cluster 時 client 收到 `127.0.0.1` 重導」的經典陷阱。",
+        "  (Reasons: 100+ char title; evidence buried inline; trailing 'this directly solves X' filler.)",
+        "",
+        "## No-filler rules (HARD)",
+        "Forbidden bridging phrases — cut them at write time:",
+        "  ❌ '這直接解決了 X 的經典陷阱' / 'this directly solves the classic X pitfall'",
+        "  ❌ '比把密碼塞進 image 的習慣安全得多' / 'much safer than X'",
+        "  ❌ '這非常重要' / 'this is very important'",
+        "  ❌ '值得一提的是' / 'it is worth noting'",
+        "  ❌ '進一步強化了' / 'further reinforces'",
+        "  ❌ '不愧是' / 'lives up to its reputation'",
+        "Just state the fact. The reader sees the implication.",
+        "",
         "## Output: produce 5 @generated blocks (JSON keys)",
-        "- `scope` — 1–2 paragraphs: what is this module's responsibility, its boundary, "
-        "  how it earns its place. May include a small Mermaid diagram if a flow matters.",
-        "- `strengths` — 3–5 bullets, each ≤ 2 sentences, each with concrete Evidence "
-        "  (commit SHA, ADR wikilink, AGENTS.md section, or `path:line`).",
-        "- `weaknesses` — 3–5 bullets, each with concrete impact ('peak-load latency spikes "
-        "  because event consumer shares the API process' — not 'could be better').",
-        "- `improvements` — 2–4 improvement opportunities. Each MUST contain all five fields:",
-        "    - **Why:** what problem it solves",
-        "    - **Evidence:** wikilink or `path:line` showing the pain is real",
-        "    - **Effort:** one of S | M | L | XL",
-        "    - **Risk if not done:** concrete consequence",
+        "- `scope` — 1–2 短段 (each ≤ 4 句): what this module owns, its boundary. "
+        "  Small Mermaid OK only if a key data-flow is non-obvious from code. Don't draw 'here are 5 routers' diagrams.",
+        "- `strengths` — 3–5 bullets following the density rules above.",
+        "- `weaknesses` — 3–5 bullets, each names a concrete impact ('peak-load latency spikes because event consumer shares API process') not vague critique ('could be better').",
+        "- `improvements` — 2–4 improvement opportunities. Each MUST contain ALL five fields and NOTHING extra:",
+        "    ### Imp <n>: <title (≤ 30 chars, verb-first)>",
+        "    - **Why:** <≤ 1 sentence, problem statement>",
+        "    - **Evidence:** <wikilink or `path:line`>",
+        "    - **Effort:** S | M | L | XL",
+        "    - **Risk if not done:** <≤ 1 sentence, concrete>",
         "    - **Confidence:** stated | high | medium | speculation",
-        "  Omit Imps you cannot fully fill in — quality over quantity.",
-        "- `dependencies` — wikilinks only (e.g. `[[modules/services]]`, `[[Architecture/decisions]]`). "
-        "  NO file paths.",
+        "  Omit Imps you cannot fully fill in — quality over quantity. No long Why prose.",
+        "- `dependencies` — wikilinks only, each ≤ 1 line. No file paths. No explanations longer than the wikilink.",
         "",
         "Return strict JSON: {\"scope\": \"...\", \"strengths\": \"...\", \"weaknesses\": \"...\", "
         "\"improvements\": \"...\", \"dependencies\": \"...\"}.",

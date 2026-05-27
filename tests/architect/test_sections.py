@@ -191,6 +191,48 @@ def test_compose_note_skips_h2_when_block_body_is_empty():
     assert "<!-- @generated:start capability-map -->" not in note
 
 
+def test_repo_label_local_prefix_yields_local_path_field():
+    from scripts.architect.sections import _repo_yaml_lines
+    lines = _repo_yaml_lines("local: /Users/leric/Desktop/code/x")
+    assert lines == ['local-path: "/Users/leric/Desktop/code/x"']
+
+
+def test_repo_label_bare_abs_path_yields_local_path_field():
+    from scripts.architect.sections import _repo_yaml_lines
+    lines = _repo_yaml_lines("/abs/path/to/repo")
+    assert lines == ['local-path: "/abs/path/to/repo"']
+
+
+def test_repo_label_url_yields_quoted_repo_field():
+    from scripts.architect.sections import _repo_yaml_lines
+    lines = _repo_yaml_lines("github.com/x/y")
+    assert lines == ['repo: "github.com/x/y"']
+
+
+def test_compose_note_emits_no_double_colon_in_frontmatter():
+    """The "repo: local: /path" YAML bug must not regress."""
+    note = compose_note(
+        section="module",
+        project="x",
+        repo_label="local: /tmp/foo",
+        commit="a",
+        signal_sources=["a"],
+        confidence="medium",
+        output_lang="zh-TW",
+        generated_blocks={"scope": "test"},
+    )
+    # Extract frontmatter block.
+    fm = note.split("---", 2)[1]
+    # No line should have the pattern "key: word: " (double-colon-with-bare-value).
+    for line in fm.splitlines():
+        # Allow values that are quoted (real YAML strings).
+        if ":" in line and line.count(":") > 1:
+            # Must be quoted past the first colon.
+            value = line.split(":", 1)[1].strip()
+            assert value.startswith('"') and value.endswith('"'), \
+                f"unquoted multi-colon in YAML: {line!r}"
+
+
 def test_compose_note_insufficient_signal_status():
     note = compose_note(
         section="future",
