@@ -53,15 +53,69 @@ _NUMBERED_RE = re.compile(r"^\d+\.\s+(.+)$", re.MULTILINE)
 
 
 def detect_candidates(project_root: Path) -> list[Candidate]:
-    """Walk Architecture/ subfiles, extract candidates, dedup, return."""
+    """Walk Architecture/ subfiles, extract candidates, dedup, return.
+
+    v3: prefers `## 改進機會` / `## Improvement opportunities` blocks from any
+    architect file (overview.md, features.md, modules/*.md, flows.md, jobs.md).
+    Each Imp becomes a fully-structured Candidate. v2 sections (future.md
+    落差分析 / 期望中的想法 / decisions.md Promote-to-ADR) are still consulted
+    as supplementary signal.
+    """
     arch = project_root / "Architecture"
     if not arch.is_dir():
         return []
     out: list[Candidate] = []
+    # v3 improvements — walk every architect file.
+    files = list(arch.glob("*.md")) + list((arch / "modules").glob("*.md"))
+    for f in files:
+        out.extend(_extract_improvements_from_file(f, arch))
+    # v2 legacy signals.
     out.extend(_extract_from_file(arch / "future.md", _FUTURE_SECTIONS))
     out.extend(_extract_from_file(arch / "decisions.md", _DECISIONS_SECTIONS))
     out.extend(_extract_from_file(arch / "roadmap.md", _ROADMAP_SECTIONS, freq_dedup=True))
     return _dedup(out)
+
+
+def _extract_improvements_from_file(path: Path, arch_root: Path) -> list[Candidate]:
+    """Pull `## 改進機會` / `## Improvement opportunities` blocks via sections.parse_improvements_block."""
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return []
+    # Locate the H2 block body.
+    pattern = re.compile(
+        r"^##\s+(?:改進機會|Improvement opportunities)\s*$([\s\S]*?)(?=^##\s|\Z)",
+        re.MULTILINE,
+    )
+    m = pattern.search(text)
+    if not m:
+        return []
+    body = m.group(1)
+    rel_path = path.relative_to(arch_root.parent).as_posix()
+    # Use the same parser sections.py exposes.
+    from scripts.architect.sections import parse_improvements_block
+    imps = parse_improvements_block(body)
+    out: list[Candidate] = []
+    arch_rel = rel_path.replace(".md", "")
+    anchor = "改進機會" if "改進機會" in text else "Improvement opportunities"
+    for imp in imps:
+        cand_id = _make_id("imp", _normalize_title(imp.title))
+        out.append(Candidate(
+            id=cand_id,
+            title=imp.title,
+            source_wikilink=f"[[{arch_rel}#{anchor}]]",
+            source_line=0,
+            kind="improvement",
+            raw_text=imp.why,
+            why=imp.why,
+            evidence=imp.evidence,
+            effort=imp.effort,
+            risk_if_not_done=imp.risk_if_not_done,
+            confidence=imp.confidence,
+        ))
+    return out
 
 
 def _extract_from_file(path: Path, section_to_kind: dict[str, str], freq_dedup: bool = False) -> list[Candidate]:

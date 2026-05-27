@@ -97,3 +97,82 @@ def test_candidate_v2_fields_still_work():
     )
     assert c.why is None
     assert c.effort is None
+
+
+def test_detect_candidates_reads_improvement_blocks_from_modules(tmp_path):
+    """v3 — `## 改進機會` / `## Improvement opportunities` blocks in modules/*.md become candidates."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "modules").mkdir(parents=True)
+    # A v3 module note with an improvement block.
+    (arch / "modules" / "backend.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 1: 拆 EventConsumer 為獨立 worker\n"
+        "- **為什麼:** API process 與 event loop 共用\n"
+        "- **證據:** [[Architecture/decisions#Event routing principle]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 流量峰值 API 延遲飆\n"
+        "- **Confidence:** medium\n"
+        "\n"
+        "### Imp 2: 加 webhook signature verification\n"
+        "- **為什麼:** 目前未驗證 LINE 來源\n"
+        "- **證據:** `backend/main.py:80`\n"
+        "- **Effort:** S\n"
+        "- **未做的風險:** webhook 可被偽造\n"
+        "- **Confidence:** stated\n"
+    )
+    # future.md still contributes via known-limitations (v3 keeps this section).
+    (arch / "future.md").write_text(
+        "## 已知限制\n"
+        "- 沒有 SSO 整合 (stated)\n"
+    )
+    cands = detect_candidates(tmp_path)
+    # 2 improvements from backend module + 1 limitation from future.md
+    by_kind = {c.kind: [x for x in cands if x.kind == c.kind] for c in cands}
+    imp_titles = [c.title for c in cands if c.kind == "improvement"]
+    assert any("EventConsumer" in t for t in imp_titles)
+    assert any("webhook signature" in t for t in imp_titles)
+    # Improvement candidate carries Imp metadata.
+    ec_cand = next(c for c in cands if c.kind == "improvement" and "EventConsumer" in c.title)
+    assert ec_cand.effort == "M"
+    assert ec_cand.confidence == "medium"
+    assert any("Event routing" in e for e in ec_cand.evidence)
+    # Limitation still picked up.
+    assert any(c.kind == "limitation" for c in cands)
+
+
+def test_detect_candidates_reads_improvements_from_overview(tmp_path):
+    """Overview-level Imps also become candidates."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    arch.mkdir(parents=True)
+    (arch / "overview.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 1: 升級 LangGraph 為 pluggable adapter\n"
+        "- **為什麼:** 目前只能跑 LangGraph,鎖死供應商\n"
+        "- **證據:** [[Architecture/decisions]]\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** 換模型成本高\n"
+        "- **Confidence:** stated\n"
+    )
+    cands = detect_candidates(tmp_path)
+    imp = [c for c in cands if c.kind == "improvement"]
+    assert len(imp) == 1
+    assert "LangGraph" in imp[0].title
+    assert imp[0].effort == "L"
+
+
+def test_detect_candidates_v2_fallback_when_no_improvement_blocks(tmp_path):
+    """If no `## 改進機會` blocks exist (legacy v2 vault), fall back to v2 detection."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    arch.mkdir(parents=True)
+    (arch / "future.md").write_text(
+        "## 落差分析\n\n- README mentions streaming, not implemented\n"
+        "## 期望中的想法\n\n- migrate to pluggable engines\n"
+    )
+    cands = detect_candidates(tmp_path)
+    # Should still find these legacy candidates.
+    kinds = {c.kind for c in cands}
+    assert "gap" in kinds
+    assert "aspiration" in kinds
