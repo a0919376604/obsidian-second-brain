@@ -516,3 +516,35 @@ def test_parse_improvements_block_skips_malformed():
     items = parse_improvements_block(text)
     assert len(items) == 1
     assert items[0].title == "Good one"
+
+
+def test_enforce_improvements_cap_drops_extras():
+    """When LLM returns 6 Imps but cap is 4, keep highest-confidence + first ones."""
+    from scripts.architect.sections import ImprovementItem, enforce_improvements_cap
+    items = [
+        ImprovementItem(title=f"Imp {i}", why="w", evidence=["[[e]]"],
+                        effort="M", risk_if_not_done="r",
+                        confidence="medium" if i % 2 else "stated")
+        for i in range(6)
+    ]
+    capped = enforce_improvements_cap(items, max_n=4)
+    assert len(capped) == 4
+    # Higher-confidence items should win over lower if cap forces choice.
+    titles = [c.title for c in capped]
+    # At least one `stated` confidence Imp survives.
+    assert any(c.confidence == "stated" for c in capped)
+
+
+def test_enforce_evidence_required_drops_imps_without_evidence():
+    from scripts.architect.sections import ImprovementItem, enforce_evidence_required
+    items = [
+        ImprovementItem(title="A", why="w", evidence=["[[x]]"], effort="S",
+                        risk_if_not_done="r", confidence="stated"),
+        ImprovementItem(title="B", why="w", evidence=[], effort="S",
+                        risk_if_not_done="r", confidence="stated"),
+    ]
+    filtered = enforce_evidence_required(items, require=True)
+    assert len(filtered) == 1
+    assert filtered[0].title == "A"
+    # With require=False, both survive (debug mode).
+    assert len(enforce_evidence_required(items, require=False)) == 2

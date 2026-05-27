@@ -711,3 +711,32 @@ def _canonicalize_field_label(label_raw: str) -> str | None:
         if needle in {a.lower() for a in aliases}:
             return canonical
     return None
+
+
+_CONFIDENCE_RANK = {"stated": 0, "high": 1, "medium": 2, "speculation": 3}
+
+
+def enforce_improvements_cap(items: list[ImprovementItem], max_n: int = 4) -> list[ImprovementItem]:
+    """Drop excess Imps when LLM returned more than the configured cap.
+
+    Sort by confidence rank (stated > high > medium > speculation) ascending
+    so higher-confidence Imps survive, then preserve original ordering within
+    same-confidence groups.
+    """
+    if len(items) <= max_n:
+        return items
+    indexed = list(enumerate(items))
+    indexed.sort(key=lambda pair: (_CONFIDENCE_RANK.get(pair[1].confidence, 99), pair[0]))
+    keep = sorted(indexed[:max_n], key=lambda pair: pair[0])
+    return [it for _, it in keep]
+
+
+def enforce_evidence_required(items: list[ImprovementItem], require: bool = True) -> list[ImprovementItem]:
+    """Drop Imps with empty evidence when `require=True`.
+
+    Default behaviour for v3. Pass `require=False` (via `--require-evidence`
+    flag set to false) to allow Evidence-free Imps during debugging.
+    """
+    if not require:
+        return items
+    return [it for it in items if it.evidence]
