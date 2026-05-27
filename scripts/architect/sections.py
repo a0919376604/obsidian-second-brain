@@ -285,3 +285,73 @@ def gap_analysis(*, readme_features: str, api_surface: dict) -> list[str]:
         if not any(t in haystack for t in tokens):
             gaps.append(bullet)
     return gaps
+
+
+_FUNCTION_BLOCK_NAMES = ("what-it-does", "inputs-and-outputs", "behavior-notes", "callers")
+
+
+def compose_function_note(
+    *,
+    project: str,
+    repo_label: str,
+    module_slug: str,
+    name: str,
+    signature: str,
+    source_file: str,
+    line_range: str,
+    commit: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+) -> str:
+    today = date.today().isoformat()
+    fm = [
+        "---",
+        "type: architecture-function",
+        f"date: {today}",
+        f'project: "[[{project}]]"',
+        f"repo: {repo_label}",
+        f"module-slug: {module_slug}",
+        f'display-name: "{name}"',
+        f'signature: "{signature}"',
+        f"source-file: {source_file}",
+        f"line-range: {line_range}",
+        f"last-scanned: {today}",
+        f"commit: {commit}",
+        f"lang: {output_lang}",
+        "tags: [architecture, function]",
+        "ai-first: true",
+        "status: current",
+        "---",
+    ]
+    body = [
+        "",
+        heading("## For future Claude", output_lang),
+        ("函式 `" + name + "` 的單頁說明,與 [[modules/" + module_slug + "]] 連動。") if output_lang == "zh-TW"
+        else ("Single-function reference for `" + name + "`. See [[modules/" + module_slug + "]] for context."),
+        "",
+        heading("## Signature", output_lang),
+        "```",
+        signature,
+        "```",
+        "",
+    ]
+    for blk in _FUNCTION_BLOCK_NAMES:
+        text = generated_blocks.get(blk, "").strip()
+        if not text:
+            continue
+        # Block name -> canonical heading. Hard-coded to keep heading names exact.
+        h_map = {
+            "what-it-does": "## What it does",
+            "inputs-and-outputs": "## Inputs and outputs",
+            "behavior-notes": "## Behavior notes",
+            "callers": "## Callers",
+        }
+        body.append(heading(h_map[blk], output_lang))
+        body.append(f"<!-- @generated:start {blk} -->")
+        body.append(text)
+        body.append(f"<!-- @generated:end {blk} -->")
+        body.append("")
+    body.append(heading("## Related", output_lang))
+    body.append(f"- [[modules/{module_slug}]]")
+    body.append(f"- [[Architecture/api-surface]]")
+    return "\n".join(fm + body) + "\n"

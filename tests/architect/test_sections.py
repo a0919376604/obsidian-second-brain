@@ -184,3 +184,42 @@ def test_gap_analysis_lists_mentioned_but_not_detected():
 def test_gap_analysis_empty_when_no_readme_features():
     from scripts.architect.sections import gap_analysis
     assert gap_analysis(readme_features="", api_surface={}) == []
+
+
+def test_compose_function_note_en():
+    from scripts.architect.sections import compose_function_note
+    note = compose_function_note(
+        project="myproj",
+        repo_label="github.com/x/y",
+        module_slug="cli",
+        name="run",
+        signature="def run(args: list[str]) -> int",
+        source_file="src/cli.py",
+        line_range="42-58",
+        commit="abc1234",
+        output_lang="en",
+        generated_blocks={"what-it-does": "Entry point for CLI."},
+    )
+    assert "type: architecture-function" in note
+    assert "module-slug: cli" in note
+    assert "## Signature" in note
+    assert "def run(args: list[str]) -> int" in note
+    assert "Entry point for CLI." in note
+
+
+def test_compose_function_note_zh_tw_translates_headings():
+    from scripts.architect.sections import compose_function_note
+    note = compose_function_note(
+        project="myproj",
+        repo_label="github.com/x/y",
+        module_slug="cli",
+        name="run",
+        signature="def run() -> int",
+        source_file="src/cli.py",
+        line_range="42-58",
+        commit="abc1234",
+        output_lang="zh-TW",
+        generated_blocks={"what-it-does": "CLI 入口點。"},
+    )
+    assert "## 函式簽章" in note
+    assert "## 功能說明" in note
