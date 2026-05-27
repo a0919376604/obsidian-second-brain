@@ -8,6 +8,7 @@ Schema versions:
   v1: fields + note_blocks (modules only).
   v2: adds `sections` (per-section narrative notes) and `functions`
       (optional --functions=public layer). Loading v1 silently migrates.
+  v3: adds `frame` marker (`description-v2` legacy vs `judgment-v3`).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-CURRENT_SCHEMA = 2
+CURRENT_SCHEMA = 3
 
 
 @dataclass
@@ -28,6 +29,7 @@ class Lockfile:
     note_blocks: dict = field(default_factory=dict)
     sections: dict = field(default_factory=dict)
     functions: dict = field(default_factory=dict)
+    frame: str = "description-v2"  # description-v2 (legacy) | judgment-v3
 
 
 def hash_value(s: str) -> str:
@@ -39,6 +41,7 @@ def load_lockfile(path: Path) -> Lockfile | None:
     if not path.exists():
         return None
     data = json.loads(path.read_text())
+    incoming_version = data.get("version", 1)
     return Lockfile(
         version=CURRENT_SCHEMA,
         scanner_version=data.get("scanner_version", "0.0.0"),
@@ -46,6 +49,7 @@ def load_lockfile(path: Path) -> Lockfile | None:
         note_blocks=data.get("note_blocks", {}),
         sections=data.get("sections", {}),
         functions=data.get("functions", {}),
+        frame=data.get("frame", "description-v2" if incoming_version < 3 else "judgment-v3"),
     )
 
 

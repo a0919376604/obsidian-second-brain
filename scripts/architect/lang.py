@@ -89,6 +89,17 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Acceptance criteria": {"en": "## Acceptance criteria", "zh-TW": "## 接受條件"},
     "## Evidence": {"en": "## Evidence", "zh-TW": "## 佐證"},
     "## Why": {"en": "## Why", "zh-TW": "## 為什麼"},
+    # v3 judgment-driven frame
+    "## Design strengths": {"en": "## Design strengths", "zh-TW": "## 設計優點"},
+    "## Design weaknesses": {"en": "## Design weaknesses", "zh-TW": "## 設計缺點 / 風險"},
+    "## Improvement opportunities": {"en": "## Improvement opportunities", "zh-TW": "## 改進機會"},
+    "## Module responsibility": {"en": "## Module responsibility", "zh-TW": "## 模組職責"},
+    "## Overall flow": {"en": "## Overall flow", "zh-TW": "## 整體流程"},
+    "## Capability scope": {"en": "## Capability scope", "zh-TW": "## 能力範圍"},
+    "## Journey": {"en": "## Journey", "zh-TW": "## 旅程"},
+    "## Personas": {"en": "## Personas", "zh-TW": "## 使用者型態"},
+    "## Jobs to be done": {"en": "## Jobs to be done", "zh-TW": "## Jobs to be Done"},
+    "## Flows": {"en": "## Flows", "zh-TW": "## 使用流程"},
 }
 
 

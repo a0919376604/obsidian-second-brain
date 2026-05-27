@@ -77,3 +77,23 @@ def test_heading_map_includes_roadmap_keys():
         assert en in HEADING_MAP, f"missing heading key {en!r}"
         assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
         assert HEADING_MAP[en]["en"] == en
+
+
+def test_heading_map_includes_v3_judgment_keys():
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        "## Design strengths": "## 設計優點",
+        "## Design weaknesses": "## 設計缺點 / 風險",
+        "## Improvement opportunities": "## 改進機會",
+        "## Module responsibility": "## 模組職責",
+        "## Overall flow": "## 整體流程",
+        "## Capability scope": "## 能力範圍",
+        "## Journey": "## 旅程",
+        "## Personas": "## 使用者型態",
+        "## Jobs to be done": "## Jobs to be Done",
+        "## Flows": "## 使用流程",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en

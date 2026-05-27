@@ -50,13 +50,13 @@ def test_v2_lockfile_round_trip_with_sections(tmp_path: Path):
     target = tmp_path / "_manifest.lock.json"
     write_lockfile(lock, target)
     loaded = load_lockfile(target)
-    assert loaded.version == 2
+    assert loaded.version == 3
     assert loaded.sections["features"]["lang"] == "zh-TW"
     assert loaded.functions["cli/main"]["source-hash"].startswith("sha256:")
 
 
 def test_v1_lockfile_migrates_on_load(tmp_path: Path):
-    """Loading a v1 lockfile should yield version=2 with empty sections/functions."""
+    """Loading a v1 lockfile should yield version=3 with empty sections/functions."""
     import json
     from scripts.architect.lockfile import load_lockfile
     target = tmp_path / "_manifest.lock.json"
@@ -67,7 +67,7 @@ def test_v1_lockfile_migrates_on_load(tmp_path: Path):
         "note_blocks": {"modules/auth.md": {"what-it-does": {"hash": "sha256:def"}}},
     }))
     loaded = load_lockfile(target)
-    assert loaded.version == 2
+    assert loaded.version == 3
     assert loaded.sections == {}
     assert loaded.functions == {}
     # Preserved.
@@ -93,3 +93,45 @@ def test_section_signal_was_changed(tmp_path: Path):
     assert section_signal_was_changed(lock, "roadmap", current_signal="X", current_lang="zh-TW") is True
     # Missing section: changed (treat as first-run).
     assert section_signal_was_changed(lock, "features", current_signal="anything", current_lang="en") is True
+
+
+def test_v3_schema_with_frame_marker(tmp_path: Path):
+    """v3 adds a `frame` field declaring which architect version produced this lockfile."""
+    import json
+    from scripts.architect.lockfile import Lockfile, load_lockfile, write_lockfile
+    lock = Lockfile(
+        version=3,
+        scanner_version="0.3.0",
+        fields={},
+        note_blocks={},
+        sections={},
+        functions={},
+        frame="judgment-v3",
+    )
+    target = tmp_path / "_manifest.lock.json"
+    write_lockfile(lock, target)
+    data = json.loads(target.read_text())
+    assert data["frame"] == "judgment-v3"
+    loaded = load_lockfile(target)
+    assert loaded.frame == "judgment-v3"
+    assert loaded.version == 3
+
+
+def test_v2_lockfile_migrates_to_v3_on_load(tmp_path: Path):
+    """Loading a v2 lockfile should yield version=3 with frame='description-v2' (legacy marker)."""
+    import json
+    from scripts.architect.lockfile import load_lockfile, CURRENT_SCHEMA
+    target = tmp_path / "_manifest.lock.json"
+    target.write_text(json.dumps({
+        "version": 2,
+        "scanner_version": "0.2.0",
+        "fields": {},
+        "note_blocks": {},
+        "sections": {"features": {"signal-hash": "sha256:abc", "lang": "en"}},
+        "functions": {},
+    }))
+    loaded = load_lockfile(target)
+    assert loaded.version == CURRENT_SCHEMA == 3
+    # v2 entries preserved; frame defaults to legacy marker.
+    assert loaded.sections["features"]["signal-hash"] == "sha256:abc"
+    assert loaded.frame == "description-v2"
