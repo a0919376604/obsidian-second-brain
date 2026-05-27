@@ -1,18 +1,23 @@
 """Lockfile: hash-based tracking of LLM-written content.
 
-For each LLM-written manifest field and note section, we store a SHA-256
-hash of the value as written. On refresh, we compute the hash of the
-current value; if it matches the lockfile, the field is LLM territory
-and may be overwritten. If it does not match, the user edited it and
-we preserve.
+For each LLM-written manifest field, note section, and narrative-section
+generated note, we store a SHA-256 hash so refresh can decide regenerate
+vs preserve.
+
+Schema versions:
+  v1: fields + note_blocks (modules only).
+  v2: adds `sections` (per-section narrative notes) and `functions`
+      (optional --functions=public layer). Loading v1 silently migrates.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+CURRENT_SCHEMA = 2
 
 
 @dataclass
@@ -21,6 +26,8 @@ class Lockfile:
     scanner_version: str
     fields: dict = field(default_factory=dict)
     note_blocks: dict = field(default_factory=dict)
+    sections: dict = field(default_factory=dict)
+    functions: dict = field(default_factory=dict)
 
 
 def hash_value(s: str) -> str:
@@ -33,16 +40,20 @@ def load_lockfile(path: Path) -> Lockfile | None:
         return None
     data = json.loads(path.read_text())
     return Lockfile(
-        version=data.get("version", 1),
+        version=CURRENT_SCHEMA,
         scanner_version=data.get("scanner_version", "0.0.0"),
         fields=data.get("fields", {}),
         note_blocks=data.get("note_blocks", {}),
+        sections=data.get("sections", {}),
+        functions=data.get("functions", {}),
     )
 
 
 def write_lockfile(lock: Lockfile, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(lock), indent=2, sort_keys=True))
+    payload = asdict(lock)
+    payload["version"] = CURRENT_SCHEMA
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def field_was_user_edited(lock: Lockfile, field_key: str, current_value: str) -> bool:
@@ -55,3 +66,18 @@ def field_was_user_edited(lock: Lockfile, field_key: str, current_value: str) ->
     if record is None:
         return False
     return record["hash"] != hash_value(current_value)
+
+
+def section_signal_was_changed(
+    lock: Lockfile, section_name: str, current_signal: str, current_lang: str
+) -> bool:
+    """True iff the section's signal hash or lang differs from the lockfile entry.
+
+    Missing section returns True (first-run = changed = should regenerate).
+    """
+    record = lock.sections.get(section_name)
+    if record is None:
+        return True
+    if record.get("lang") != current_lang:
+        return True
+    return record.get("signal-hash") != hash_value(current_signal)
