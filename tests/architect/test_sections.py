@@ -357,3 +357,49 @@ def test_module_block_headings_translate():
     for block in ("scope", "strengths", "weaknesses", "improvements", "dependencies"):
         h_en = _BLOCK_HEADINGS[block]
         assert heading(h_en, "zh-TW") != h_en, f"{block} heading {h_en!r} has no zh-TW mapping"
+
+
+def test_module_prompt_demands_judgment_not_description():
+    """v3 module prompt must NOT ask for file lists; MUST ask for strengths/weaknesses/improvements."""
+    from scripts.architect.sections import build_module_prompt
+    prompt = build_module_prompt(
+        module_slug="backend",
+        repomix_packed="(packed code goes here)",
+        agents_md_excerpt="(AGENTS.md excerpt)",
+        output_lang="zh-TW",
+    )
+    # Must not ask for file listings
+    assert "key files" not in prompt.lower()
+    assert "list of files" not in prompt.lower()
+    # Must ask for judgment blocks
+    assert "strengths" in prompt
+    assert "weaknesses" in prompt
+    assert "improvement" in prompt.lower()
+    # Each Imp must demand Evidence
+    assert "evidence" in prompt.lower() or "Evidence" in prompt
+    # zh-TW directive
+    assert "繁體中文" in prompt or "zh-TW" in prompt
+
+
+def test_module_prompt_en_no_chinese_directive():
+    from scripts.architect.sections import build_module_prompt
+    prompt = build_module_prompt(
+        module_slug="backend",
+        repomix_packed="",
+        agents_md_excerpt="",
+        output_lang="en",
+    )
+    assert "繁體中文" not in prompt
+    assert "Evidence" in prompt or "evidence" in prompt
+
+
+def test_module_prompt_demands_evidence_required_for_each_improvement():
+    from scripts.architect.sections import build_module_prompt
+    prompt = build_module_prompt(
+        module_slug="backend", repomix_packed="", agents_md_excerpt="", output_lang="en",
+    )
+    # Prompt must say: if you can't cite evidence, don't include that improvement.
+    assert "do not" in prompt.lower() or "skip" in prompt.lower() or "drop" in prompt.lower()
+    # And mention the required Imp fields explicitly.
+    for field in ("Why", "Evidence", "Effort", "Risk", "Confidence"):
+        assert field in prompt, f"missing required Imp field {field!r}"

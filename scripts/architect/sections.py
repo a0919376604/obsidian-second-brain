@@ -529,3 +529,69 @@ def compose_overview(
     body.append(heading("## Related", output_lang))
     body.append(f"- [[{project}]]")
     return "\n".join(fm + body) + "\n"
+
+
+def build_module_prompt(
+    *,
+    module_slug: str,
+    repomix_packed: str,
+    agents_md_excerpt: str,
+    output_lang: str,
+) -> str:
+    """v3 — judgment-driven module synthesis prompt.
+
+    NO file listing. The agent demands strengths / weaknesses / improvements,
+    each grounded in Evidence (commit, decision wikilink, code path:line).
+    """
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫 scope/strengths/weaknesses/improvements 段散文。"
+            "Code identifier (檔名、function/class、env var、wikilink 內檔名段) "
+            "保持英文。Evidence 中可包含 `path:line` inline 引用。"
+        )
+    else:
+        lang_directive = (
+            "Write scope/strengths/weaknesses/improvements prose in English. "
+            "Code identifiers stay English. Evidence may include `path:line` inline citations."
+        )
+
+    return "\n".join([
+        f"You are writing the architecture *judgment* document for module `{module_slug}`.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. DO NOT list files. The codebase is the source of truth — vault notes "
+        "   capture judgment that the codebase does NOT record (design tradeoffs, risks, "
+        "   improvement opportunities).",
+        "2. DO NOT generate 'how it works' style transcription. If a reader needs that, "
+        "   they read the code.",
+        "3. EVERY improvement must cite Evidence. If you cannot cite Evidence for an idea, "
+        "   DO NOT include that improvement — drop it. We refuse speculative roadmap items.",
+        "",
+        "## Output: produce 5 @generated blocks (JSON keys)",
+        "- `scope` — 1–2 paragraphs: what is this module's responsibility, its boundary, "
+        "  how it earns its place. May include a small Mermaid diagram if a flow matters.",
+        "- `strengths` — 3–5 bullets, each ≤ 2 sentences, each with concrete Evidence "
+        "  (commit SHA, ADR wikilink, AGENTS.md section, or `path:line`).",
+        "- `weaknesses` — 3–5 bullets, each with concrete impact ('peak-load latency spikes "
+        "  because event consumer shares the API process' — not 'could be better').",
+        "- `improvements` — 2–4 improvement opportunities. Each MUST contain all five fields:",
+        "    - **Why:** what problem it solves",
+        "    - **Evidence:** wikilink or `path:line` showing the pain is real",
+        "    - **Effort:** one of S | M | L | XL",
+        "    - **Risk if not done:** concrete consequence",
+        "    - **Confidence:** stated | high | medium | speculation",
+        "  Omit Imps you cannot fully fill in — quality over quantity.",
+        "- `dependencies` — wikilinks only (e.g. `[[modules/services]]`, `[[Architecture/decisions]]`). "
+        "  NO file paths.",
+        "",
+        "Return strict JSON: {\"scope\": \"...\", \"strengths\": \"...\", \"weaknesses\": \"...\", "
+        "\"improvements\": \"...\", \"dependencies\": \"...\"}.",
+        "",
+        "## Module context (repomix packed)",
+        repomix_packed[:50000],  # cap to avoid blowing the prompt
+        "",
+        "## AGENTS.md excerpt",
+        agents_md_excerpt[:5000],
+    ])
