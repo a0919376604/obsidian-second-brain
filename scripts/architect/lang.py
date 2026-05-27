@@ -1,0 +1,93 @@
+"""Resolve the output language for architect-generated notes.
+
+Precedence: CLI flag > vault _CLAUDE.md `- output-lang: <code>` line > default 'en'.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+SUPPORTED_LANGS = ("en", "zh-TW")
+DEFAULT_LANG = "en"
+
+_OUTPUT_LANG_RE = re.compile(r"^\s*-\s*output-lang:\s*([A-Za-z0-9_-]+)\s*$", re.MULTILINE)
+
+
+def resolve_output_lang(cli_flag: str | None, vault_root: Path) -> str:
+    """Return the effective output language code.
+
+    Args:
+        cli_flag: value of `--lang=` passed to the command, or None.
+        vault_root: directory containing `_CLAUDE.md`.
+
+    Returns 'en' on any invalid or missing signal.
+    """
+    if cli_flag and cli_flag in SUPPORTED_LANGS:
+        return cli_flag
+    claude_md = vault_root / "_CLAUDE.md"
+    if claude_md.exists():
+        m = _OUTPUT_LANG_RE.search(claude_md.read_text(encoding="utf-8"))
+        if m and m.group(1) in SUPPORTED_LANGS:
+            return m.group(1)
+    return DEFAULT_LANG
+
+
+HEADING_MAP: dict[str, dict[str, str]] = {
+    # Universal headings reused across types.
+    "## For future Claude": {"en": "## For future Claude", "zh-TW": "## 給未來 Claude"},
+    "## Summary": {"en": "## Summary", "zh-TW": "## 摘要"},
+    "## Related": {"en": "## Related", "zh-TW": "## 相關"},
+    # Overview headings.
+    "## Purpose": {"en": "## Purpose", "zh-TW": "## 用途"},
+    "## Stack": {"en": "## Stack", "zh-TW": "## 技術棧"},
+    "## Capability MOC": {"en": "## Capability MOC", "zh-TW": "## 能力地圖 MOC"},
+    "## Structure MOC": {"en": "## Structure MOC", "zh-TW": "## 結構地圖 MOC"},
+    "## API surface": {"en": "## API surface", "zh-TW": "## API 介面"},
+    "## Layer map": {"en": "## Layer map", "zh-TW": "## 分層圖"},
+    "## External dependencies": {"en": "## External dependencies", "zh-TW": "## 外部相依"},
+    "## Key abstractions": {"en": "## Key abstractions", "zh-TW": "## 核心抽象"},
+    # features.md
+    "## Capability map": {"en": "## Capability map", "zh-TW": "## 能力地圖"},
+    "## Notable details": {"en": "## Notable details", "zh-TW": "## 補充細節"},
+    # roadmap.md
+    "## Near term": {"en": "## Near term", "zh-TW": "## 近期"},
+    "## Trajectory": {"en": "## Trajectory", "zh-TW": "## 軌跡"},
+    "## TODO clusters": {"en": "## TODO clusters", "zh-TW": "## TODO 群組"},
+    "## Signals reviewed": {"en": "## Signals reviewed", "zh-TW": "## 已檢視訊號"},
+    # decisions.md
+    "## Stack rationale": {"en": "## Stack rationale", "zh-TW": "## 技術棧理由"},
+    "## Detected ADRs": {"en": "## Detected ADRs", "zh-TW": "## 已偵測的 ADR"},
+    "## Pattern decisions": {"en": "## Pattern decisions", "zh-TW": "## 模式決定"},
+    "## Commit-message decisions": {"en": "## Commit-message decisions", "zh-TW": "## Commit 訊息決定"},
+    "## Promote to ADR": {"en": "## Promote to ADR", "zh-TW": "## 建議升級為 ADR"},
+    # future.md
+    "## Known limitations": {"en": "## Known limitations", "zh-TW": "## 已知限制"},
+    "## Gap analysis": {"en": "## Gap analysis", "zh-TW": "## 落差分析"},
+    "## Aspirational ideas": {"en": "## Aspirational ideas", "zh-TW": "## 期望中的想法"},
+    # api-surface.md
+    "## CLI commands": {"en": "## CLI commands", "zh-TW": "## CLI 命令"},
+    "## HTTP routes": {"en": "## HTTP routes", "zh-TW": "## HTTP 路由"},
+    "## Public exports": {"en": "## Public exports", "zh-TW": "## 公開匯出"},
+    "## Environment variables": {"en": "## Environment variables", "zh-TW": "## 環境變數"},
+    # modules (existing, restated for translation table completeness).
+    "## What it does": {"en": "## What it does", "zh-TW": "## 功能說明"},
+    "## How it works": {"en": "## How it works", "zh-TW": "## 運作方式"},
+    "## Key files": {"en": "## Key files", "zh-TW": "## 重點檔案"},
+    "## Depends on": {"en": "## Depends on", "zh-TW": "## 相依於"},
+    "## Consumed by": {"en": "## Consumed by", "zh-TW": "## 被誰使用"},
+    "## Recent activity": {"en": "## Recent activity", "zh-TW": "## 近期活動"},
+    # function notes.
+    "## Signature": {"en": "## Signature", "zh-TW": "## 函式簽章"},
+    "## Inputs and outputs": {"en": "## Inputs and outputs", "zh-TW": "## 輸入輸出"},
+    "## Behavior notes": {"en": "## Behavior notes", "zh-TW": "## 行為註記"},
+    "## Callers": {"en": "## Callers", "zh-TW": "## 呼叫者"},
+}
+
+
+def heading(key: str, lang: str) -> str:
+    """Translate a canonical (English) heading to the given language.
+
+    Unknown keys pass through unchanged so the caller fails loud at render time.
+    """
+    return HEADING_MAP.get(key, {}).get(lang, key)
