@@ -10,10 +10,15 @@ Use the obsidian-second-brain skill. Execute `/obsidian-architect $ARGUMENTS`:
 The argument is `<repo-path>` (local path or github URL). Optional flags:
 `--project=<P>` (force project hub binding), `--refresh` (explicit refresh),
 `--dry-run` (Phase 1 only, no vault writes), `--force` (ignore "no changes" gate),
-`--functions=<off|public>` (default off; `public` generates per-function notes
-for symbols on the public API surface), `--skip-sections=<csv>` and
-`--only-sections=<csv>` for surgical regeneration, `--lang=<en|zh-TW>` to
-override the vault default from `_CLAUDE.md`'s `- output-lang:` line.
+`--functions=<off|public>`, `--skip-sections=<csv>`, `--only-sections=<csv>`,
+`--lang=<en|zh-TW>` (override vault `_CLAUDE.md output-lang`).
+
+**v3-specific flags:**
+- `--frame=<judgment|description>` — default `judgment` (v3). Use `description`
+  to fall back to v2 behaviour for compatibility.
+- `--improvements-per-file=<N>` — cap on Imps per architect file. Default 4.
+- `--require-evidence` — default true. When false, LLM may emit Imps without
+  Evidence (debugging only; not recommended).
 
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
@@ -50,6 +55,26 @@ The scan-report includes manifest signals AND narrative signals:
 
 If `--dry-run`, print the manifest to the user and stop. No vault writes.
 
+## Phase 1.5: v2 → v3 migration (only when `--frame=judgment` AND existing vault is v2)
+
+Detect if `Projects/<P>/Architecture/_manifest.lock.json` exists and reports
+`schema-version: 2` (or `version` < 3, or `frame != "judgment-v3"`). If so:
+
+1. Call `scripts.architect.migration.plan_v2_to_v3_migration(arch_dir)` to
+   compute what would change.
+2. Print the plan to the user — list which files will be modified, which
+   `@generated` blocks will be dropped (the v2 file-tree noise), and which
+   `@user` blocks will be preserved.
+3. ASK user: `proceed | dry-run | abort`. (`--force` bypasses with proceed.)
+4. On `proceed`: call `scripts.architect.migration.backup_architecture_dir(arch_dir)`
+   to write `_archive/architecture-pre-v3-<timestamp>.tar.gz`, then call
+   `apply_v2_to_v3_migration(arch_dir, plan, dry_run=False)`.
+5. On `dry-run`: call `apply_v2_to_v3_migration(arch_dir, plan, dry_run=True)`
+   and stop. User reviews, re-runs without dry-run when ready.
+
+After successful migration, lockfile is overwritten in Phase 5 (per-section
+synthesis) with `schema-version: 3` and `frame: "judgment-v3"`.
+
 ## Phase 2: Manifest review
 
 Read `_manifest.yml` from the temp output. If
@@ -65,50 +90,40 @@ ASK the user to confirm or edit. They can:
 
 On approve: write `Projects/<P>/Architecture/_manifest.yml` to the vault.
 
-## Phase 3: Per-module synthesis
+## Phase 3: Per-module synthesis (v3 judgment frame)
 
-For each module in the approved manifest where `excluded: false`:
+For each module slug in the approved manifest (not excluded):
 
-1. Read the lockfile (`Projects/<P>/Architecture/_manifest.lock.json` if it exists)
-   and call `decide_module_refresh()` from `scripts/architect/refresh.py` to
-   choose generate / regenerate / skip.
-
-2. For generate or regenerate, run repomix to pack the module:
-
+1. Pack the module's source paths via repomix:
    ```bash
-   repomix --include "<module-paths>" --style xml --compress
+   repomix --include "<paths>" --style xml --compress > /tmp/architect-<hash>/repomix-<slug>.xml
    ```
+2. Build the LLM prompt:
+   ```python
+   from scripts.architect.sections import build_module_prompt
+   prompt = build_module_prompt(
+       module_slug=slug,
+       repomix_packed=open("/tmp/architect-<hash>/repomix-<slug>.xml").read(),
+       agents_md_excerpt=agents_md_text[:5000],
+       output_lang=output_lang,
+   )
+   ```
+3. Invoke the LLM. Expect strict JSON with 5 keys:
+   `scope, strengths, weaknesses, improvements, dependencies`.
+4. Validate the `improvements` block: parse via
+   `scripts.architect.sections.parse_improvements_block(...)` and confirm
+   ≥1 Imp survives (every Imp must include Why/Evidence/Effort/Risk/Confidence).
+   If 0 Imps parse, retry once with stricter prompt; if still 0, write the
+   block as `_(無 Evidence-grounded improvements;owner 校對)_` and continue.
+5. Compose the module note via `scripts.architect.sections.compose_note(...)`
+   with `section="module"` (note: v3 introduces this section name).
+6. Write to `Projects/<P>/Architecture/modules/<slug>.md`.
+7. Update `_manifest.lock.json` `modules[<slug>]` entry.
 
-   If the packed output exceeds 80,000 tokens as reported by repomix,
-   re-pack with `--top-files-len 5` plus include only file headers
-   (docstrings or leading comment block) for the rest. Set
-   `scan-truncated: true` in the module note frontmatter.
-
-3. Write `Projects/<P>/Architecture/modules/<slug>.md` following the schema
-   in `references/ai-first-rules.md` (type: architecture-module).
-   Body sections must be wrapped in sentinels:
-   - `## What it does` -> `<!-- @generated:start what-it-does -->` block.
-     If manifest has `description: <text>`, insert that text verbatim into
-     this block (LLM does not regenerate).
-   - `## How it works` -> generated block
-   - `## Key files` -> generated block
-   - `## Depends on` -> generated block (wikilinks to other module notes)
-   - `## Consumed by` -> generated block (inverse)
-   - `## Recent activity` -> generated block (last 5 git commits via
-     `git log -5 --oneline -- <paths>`)
-   - `## Related` -> generated block
-
-   For the existing-note case (regenerate), first parse the existing file with
-   `scripts/architect/sentinels.parse_blocks()`. Replace `@generated` block
-   bodies; preserve `@user` blocks verbatim; for content outside any sentinel,
-   compare against lockfile `note_blocks` hash and preserve if user-edited
-   (emit a warning).
-
-4. Update the lockfile's `note_blocks` entry for this note with hashes of the
-   newly written generated blocks.
-
-After every non-excluded module is processed: continue to Phase 3.5, then
-regenerate `overview.md`.
+The new module note:
+- Has NO `## Key files` section.
+- Body is judgment, not transcription.
+- Dependencies section uses wikilinks only.
 
 ## Phase 3.5: Per-section synthesis
 
@@ -125,6 +140,44 @@ For each section in order (`api-surface`, `features`, `decisions`, `roadmap`,
 1. Call `scripts.architect.sections.collect_signals(section, scan_report, manifest_modules)` to get the signal subset.
 2. Compute `signal_hash(signal)` and call `scripts.architect.refresh.decide_section_refresh(lock, section=..., current_signal=hash, current_lang=output_lang, force=force, refresh_flag=refresh)`. If SKIP, continue.
 3. For api-surface, use the deterministic table renderers from `scripts.architect.api_surface_render` — no LLM call for the table contents; LLM only writes the `summary` block.
+
+### Phase 3.5.5: personas / jobs / flows synthesis (v3)
+
+After api-surface, BEFORE features (because features cross-references jobs/flows).
+
+For each new product-eye file:
+
+**Personas:**
+```python
+from scripts.architect.personas import collect_persona_signal, build_personas_prompt, render_personas_section, Persona
+sig = collect_persona_signal(repo_root)
+if sig.has_explicit_section:
+    confidence_default = "stated"
+    readme_excerpt = sig.raw_text
+else:
+    confidence_default = "medium"
+    readme_excerpt = "(no explicit personas section)"
+prompt = build_personas_prompt(
+    project=project_name,
+    readme_excerpt=readme_excerpt,
+    agents_md_excerpt=agents_md_text[:5000],
+    features_summary=features_summary_text,
+    output_lang=output_lang,
+)
+# Agent invokes LLM, parses JSON into list[Persona], then:
+note_body = render_personas_section(personas, lang=output_lang)
+# Wrap in `## 使用者型態` heading + frontmatter + sentinel; write to personas.md.
+```
+
+**Jobs** — similar pattern using `scripts.architect.jobs` (depends on personas being written first so the prompt can cite them).
+
+**Flows** — similar pattern using `scripts.architect.flows` (depends on personas + api-surface summary).
+
+When `has_explicit_section is False`, prepend an Obsidian callout to the file body:
+```markdown
+> [!warning]+ 本檔大半為 LLM 推論,owner 校對前不可作為正式產品 spec
+```
+
 4. For features / decisions / roadmap / future, build the LLM prompt with `sections.build_prompt(...)`, run it, parse the JSON response into a `{block-name: body}` dict.
 5. Call `sections.compose_note(section=..., generated_blocks=..., output_lang=..., ...)` to assemble the markdown.
 6. Write to `Projects/<P>/Architecture/<filename>`.
@@ -141,7 +194,19 @@ If `--functions=public`:
 
 Failure isolation: if any one section or function synthesis throws, write the note with `status: scan-failed`, record the error in the body, and continue.
 
-## Overview synthesis (Phase 4 — MOC style)
+## Phase 4: Overview synthesis (v3 frame)
+
+In addition to the v2 MOC structure (Stack frontmatter, Capability MOC,
+Structure MOC), the overview now emits its own `## 改進機會` block —
+4-6 project-level improvement opportunities that span modules (e.g.
+"split EventConsumer from API process for independent scaling"). Each
+Imp follows the same Why/Evidence/Effort/Risk/Confidence schema.
+
+Build prompt via `sections.build_overview_prompt(...)` (existing helper —
+prompt instructs LLM to produce purpose / layer-map / external-deps /
+key-abstractions / **improvements** blocks).
+
+Add `improvements` to the overview's `_BLOCK_NAMES` if not already present.
 
 Read every section note's `## Summary` block, plus stack, modules, and entry
 points from the scan-report.
