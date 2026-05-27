@@ -133,3 +133,14 @@ def test_compose_note_insufficient_signal_status():
         status="insufficient-signal",
     )
     assert "status: insufficient-signal" in note
+
+
+def test_module_for_path_returns_slug():
+    from scripts.architect.sections import module_for_path
+    manifest = [
+        {"slug": "auth", "paths": ["src/auth"]},
+        {"slug": "api", "paths": ["src/api/routes.py"]},
+    ]
+    assert module_for_path("src/auth/login.py", manifest) == "auth"
+    assert module_for_path("src/api/routes.py", manifest) == "api"
+    assert module_for_path("random/orphan.py", manifest) is None

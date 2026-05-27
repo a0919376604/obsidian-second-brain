@@ -232,3 +232,13 @@ def _preamble_for(section: str, lang: str) -> str:
         "roadmap": "Synthesized from CHANGELOG, README, and TODO clusters. Inference is marked.",
         "future": "Gap analysis and north-star ideas. Mostly inferred, not committed.",
     }[section]
+
+
+def module_for_path(rel_path: str, manifest_modules: list[dict]) -> str | None:
+    """Return the slug of the module containing `rel_path`, or None."""
+    src = rel_path.split(":")[0]
+    for m in manifest_modules:
+        for prefix in m.get("paths", []):
+            if src == prefix or src.startswith(prefix.rstrip("/") + "/"):
+                return m["slug"]
+    return None
