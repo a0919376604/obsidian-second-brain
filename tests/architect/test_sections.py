@@ -223,3 +223,47 @@ def test_compose_function_note_zh_tw_translates_headings():
     )
     assert "## 函式簽章" in note
     assert "## 功能說明" in note
+
+
+def test_compose_overview_en_emits_moc():
+    from scripts.architect.sections import compose_overview
+    note = compose_overview(
+        project="myproj",
+        repo_label="github.com/x/y",
+        commit="abc1234",
+        stack={"primary-language": "Python", "frameworks": ["FastAPI"]},
+        output_lang="en",
+        modules=[{"slug": "cli", "display_name": "CLI"}, {"slug": "api", "display_name": "API"}],
+        entry_points=[{"path": "src/cli.py", "label": "pyproject.scripts.run", "kind": "pyproject"}],
+        generated_blocks={
+            "purpose": "We do things.",
+            "layer-map": "```mermaid\ngraph TD\n  A --> B\n```",
+            "external-deps": "- FastAPI 0.110",
+            "key-abstractions": "- Module",
+        },
+    )
+    assert "type: architecture-overview" in note
+    assert "moc-style: true" in note
+    assert "primary-language: Python" in note
+    assert "## Capability MOC" in note
+    assert "[[Architecture/features]]" in note
+    assert "[[Architecture/api-surface]]" in note
+    assert "[[modules/cli]]" in note
+    assert "graph TD" in note
+
+
+def test_compose_overview_zh_tw_translates_and_omits_empty_stack():
+    from scripts.architect.sections import compose_overview
+    note = compose_overview(
+        project="myproj",
+        repo_label="github.com/x/y",
+        commit="abc1234",
+        stack={},  # empty -> no stack block in frontmatter
+        output_lang="zh-TW",
+        modules=[],
+        entry_points=[],
+        generated_blocks={},
+    )
+    assert "## 給未來 Claude" in note
+    assert "## 能力地圖 MOC" in note
+    assert "stack:" not in note  # empty stack omitted per spec §5.7

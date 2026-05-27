@@ -355,3 +355,130 @@ def compose_function_note(
     body.append(f"- [[modules/{module_slug}]]")
     body.append(f"- [[Architecture/api-surface]]")
     return "\n".join(fm + body) + "\n"
+
+
+def _yaml_block(name: str, mapping: dict, indent: int = 2) -> str:
+    """Render a simple flat YAML block. Lists are inline JSON-ish."""
+    if not mapping:
+        return ""
+    out = [f"{name}:"]
+    pad = " " * indent
+    for k, v in mapping.items():
+        if isinstance(v, list):
+            out.append(f"{pad}{k}: [{', '.join(str(x) for x in v)}]")
+        else:
+            out.append(f"{pad}{k}: {v}")
+    return "\n".join(out)
+
+
+def compose_overview(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    stack: dict,
+    output_lang: str,
+    modules: list[dict],
+    entry_points: list[dict],
+    generated_blocks: dict[str, str],
+) -> str:
+    """Compose the MOC-style overview.md."""
+    today = date.today().isoformat()
+    fm = [
+        "---",
+        "type: architecture-overview",
+        "moc-style: true",
+        f"date: {today}",
+        f'project: "[[{project}]]"',
+        f"repo: {repo_label}",
+        f"last-scanned: {today}",
+        f"commit: {commit}",
+        f"lang: {output_lang}",
+        "tags: [architecture, codebase-doc, moc]",
+        "ai-first: true",
+        "status: current",
+    ]
+    if stack:
+        fm.append(_yaml_block("stack", stack))
+    fm.append("---")
+
+    body = [
+        "",
+        heading("## For future Claude", output_lang),
+    ]
+    if output_lang == "zh-TW":
+        body.append("這個檔是 MOC。不要直接讀這裡的內容,跟著 wikilink 走。每個深入內容在自己的 note,future-Claude 想 grep 一段就 grep 那一段。")
+    else:
+        body.append("This note is a MOC. Don't read it for content — follow the wikilinks. Each deep-dive lives in its own note so you can grep one without loading the rest.")
+    body.append("")
+
+    # Purpose (LLM block).
+    if generated_blocks.get("purpose"):
+        body.append(heading("## Purpose", output_lang))
+        body.append("<!-- @generated:start purpose -->")
+        body.append(generated_blocks["purpose"])
+        body.append("<!-- @generated:end purpose -->")
+        body.append("")
+
+    # Stack (mirrors frontmatter, deterministic).
+    if stack:
+        body.append(heading("## Stack", output_lang))
+        for k, v in stack.items():
+            if isinstance(v, list):
+                body.append(f"- **{k}:** {', '.join(str(x) for x in v)}")
+            else:
+                body.append(f"- **{k}:** {v}")
+        suffix = "(見 [[Architecture/decisions]] 的理由)" if output_lang == "zh-TW" else "(see [[Architecture/decisions]] for rationale)"
+        body.append("")
+        body.append(suffix)
+        body.append("")
+
+    # Capability MOC (deterministic).
+    body.append(heading("## Capability MOC", output_lang))
+    body.append("- [[Architecture/features]]")
+    body.append("- [[Architecture/roadmap]]")
+    body.append("- [[Architecture/decisions]]")
+    body.append("- [[Architecture/future]]")
+    body.append("")
+    body.append(heading("## API surface", output_lang))
+    body.append("- [[Architecture/api-surface]]")
+    body.append("")
+
+    # Structure MOC (deterministic).
+    body.append(heading("## Structure MOC", output_lang))
+    for m in modules:
+        body.append(f"- [[modules/{m['slug']}]]")
+    if entry_points:
+        ep_label = "Entry points" if output_lang == "en" else "進入點"
+        body.append(f"- **{ep_label}:**")
+        for ep in entry_points:
+            body.append(f"  - `{ep['label']}` -> `{ep['path']}`")
+    body.append("")
+
+    # Layer map (LLM block).
+    if generated_blocks.get("layer-map"):
+        body.append(heading("## Layer map", output_lang))
+        body.append("<!-- @generated:start layer-map -->")
+        body.append(generated_blocks["layer-map"])
+        body.append("<!-- @generated:end layer-map -->")
+        body.append("")
+
+    # External deps (LLM block, deterministic-ish).
+    if generated_blocks.get("external-deps"):
+        body.append(heading("## External dependencies", output_lang))
+        body.append("<!-- @generated:start external-deps -->")
+        body.append(generated_blocks["external-deps"])
+        body.append("<!-- @generated:end external-deps -->")
+        body.append("")
+
+    # Key abstractions (LLM).
+    if generated_blocks.get("key-abstractions"):
+        body.append(heading("## Key abstractions", output_lang))
+        body.append("<!-- @generated:start key-abstractions -->")
+        body.append(generated_blocks["key-abstractions"])
+        body.append("<!-- @generated:end key-abstractions -->")
+        body.append("")
+
+    body.append(heading("## Related", output_lang))
+    body.append(f"- [[{project}]]")
+    return "\n".join(fm + body) + "\n"
