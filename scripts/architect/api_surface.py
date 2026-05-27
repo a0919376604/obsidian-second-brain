@@ -84,6 +84,9 @@ _EXCLUDED_PATH_PARTS = frozenset({
     "vendor",
     # IDE / OS noise.
     ".idea", ".vscode",
+    # Claude Code / Conductor worktrees — these mirror the repo and double-count
+    # every API surface item if walked.
+    ".claude", "worktrees",
 })
 
 
