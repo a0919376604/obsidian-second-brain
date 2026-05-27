@@ -48,28 +48,75 @@ _FRAMEWORK_MAP = {
 _TEST_MAP_PY = {"pytest": "pytest", "unittest": "unittest"}
 _TEST_MAP_JS = {"vitest": "vitest", "jest": "jest", "mocha": "mocha", "playwright": "playwright"}
 
+# Subdirectories that conventionally host an app or service in a monorepo.
+# Detection walks these one level deep (no further) and only when no metadata
+# is found at the repo root, OR alongside root metadata to extend coverage.
+_MONOREPO_PROBES = (
+    "backend", "frontend", "api", "web", "server", "client", "app", "core",
+    "services", "apps", "packages",  # the latter three may themselves contain children
+)
+
 
 def detect_stack(repo_root: Path) -> dict:
-    """Return a dict ready to drop into overview frontmatter as `stack: {...}`."""
+    """Return a dict ready to drop into overview frontmatter as `stack: {...}`.
+
+    Walks the repo root plus a curated set of monorepo subdirectories so a repo
+    with `backend/pyproject.toml` and `frontend/package.json` reports both
+    languages, all frameworks, and per-module breakdown.
+    """
     repo_root = repo_root.resolve()
-    stack: dict = {}
-    py = _from_pyproject(repo_root)
-    js = _from_package_json(repo_root)
-    if (repo_root / "pyproject.toml").exists():
-        stack["primary-language"] = "Python"
-        stack.update(py)
-    elif (repo_root / "package.json").exists():
-        stack["primary-language"] = "TypeScript or JavaScript"
-        stack.update(js)
-    elif (repo_root / "Cargo.toml").exists():
-        stack["primary-language"] = "Rust"
-    elif (repo_root / "go.mod").exists():
-        stack["primary-language"] = "Go"
-    # Build tools.
+    per_module: dict[str, dict] = {}
+
+    root_lang, root_facts = _detect_at(repo_root)
+    if root_lang:
+        per_module["."] = {"language": root_lang, **root_facts}
+
+    for sub in _MONOREPO_PROBES:
+        d = repo_root / sub
+        if not d.is_dir():
+            continue
+        lang, facts = _detect_at(d)
+        if lang:
+            per_module[sub] = {"language": lang, **facts}
+
+    if not per_module:
+        return {}
+
+    # Aggregate. Primary-language is union, sorted for stability.
+    langs = sorted({m["language"] for m in per_module.values()})
+    frameworks = sorted({fw for m in per_module.values() for fw in m.get("frameworks", [])})
+    tests = sorted({m["test"] for m in per_module.values() if m.get("test")})
+    builds = sorted({m["build"] for m in per_module.values() if m.get("build")})
+
+    stack: dict = {"primary-language": " + ".join(langs)}
+    if frameworks:
+        stack["frameworks"] = frameworks
+    if tests:
+        stack["test"] = tests[0] if len(tests) == 1 else " + ".join(tests)
+    if builds:
+        stack["build"] = builds[0] if len(builds) == 1 else " + ".join(builds)
     if (repo_root / "turbo.json").exists():
-        stack.setdefault("build", "")
-        stack["build"] = (stack.get("build") + " + turbo").strip(" +")
+        stack["build"] = (stack.get("build", "") + " + turbo").strip(" +")
+    # Drop the synthetic "." key so consumers see only real module names.
+    real_modules = {k: v for k, v in per_module.items() if k != "."}
+    if real_modules:
+        stack["modules"] = real_modules
     return stack
+
+
+def _detect_at(directory: Path) -> tuple[str | None, dict]:
+    """Return (language, facts) for whichever metadata file is in `directory`."""
+    if (directory / "pyproject.toml").exists():
+        return "Python", _from_pyproject(directory)
+    if (directory / "package.json").exists():
+        return "TypeScript or JavaScript", _from_package_json(directory)
+    if (directory / "Cargo.toml").exists():
+        return "Rust", {}
+    if (directory / "go.mod").exists():
+        return "Go", {}
+    if (directory / "Gemfile").exists():
+        return "Ruby", {}
+    return None, {}
 
 
 def _from_pyproject(repo_root: Path) -> dict:

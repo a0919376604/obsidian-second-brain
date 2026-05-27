@@ -1,4 +1,4 @@
-"""Discover existing decision documents (ADRs, ARCHITECTURE.md, DESIGN.md).
+"""Discover existing decision documents (ADRs, ARCHITECTURE.md, DESIGN.md, AGENTS.md, CLAUDE.md).
 
 Returns a list of DecisionDoc records describing each found file.
 """
@@ -10,14 +10,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _ADR_DIRS = ("docs/adr", "docs/decisions", "architecture/decisions", "doc/adr")
-_TOP_LEVEL_DOCS = (("ARCHITECTURE.md", "architecture-doc"), ("DESIGN.md", "design-doc"))
+_TOP_LEVEL_DOCS = (
+    ("ARCHITECTURE.md", "architecture-doc"),
+    ("DESIGN.md", "design-doc"),
+    # "For AI agents" instruction files are increasingly the canonical place
+    # repo authors record stack, structure, and operational decisions in prose.
+    # The leading-underscore vault marker `_CLAUDE.md` is intentionally NOT here.
+    ("AGENTS.md", "agent-doc"),
+    ("CLAUDE.md", "agent-doc"),
+)
 
 
 @dataclass
 class DecisionDoc:
     path: str         # repo-relative posix path
     title: str        # first H1 or fallback to filename stem
-    kind: str         # adr / architecture-doc / design-doc
+    kind: str         # adr / architecture-doc / design-doc / agent-doc
 
 
 def discover_decision_docs(repo_root: Path) -> list[DecisionDoc]:

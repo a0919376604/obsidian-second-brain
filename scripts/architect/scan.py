@@ -16,7 +16,7 @@ from scripts.architect.deps import detect_external_deps
 from scripts.architect.entry_points import detect_entry_points
 from scripts.architect.manifest import Manifest
 from scripts.architect.proposal import propose_modules_with_heuristics
-from scripts.architect.readme import extract_sections
+from scripts.architect.readme import extract_from_repo
 from scripts.architect.repomix import pack_repo_metadata
 from scripts.architect.stack import detect_stack
 from scripts.architect.todos import aggregate_todos
@@ -62,8 +62,9 @@ def run_phase_one(repo_root: Path) -> ScanResult:
     )
 
     # Narrative signal collection.
-    readme_text = (repo_root / "README.md").read_text(encoding="utf-8") if (repo_root / "README.md").exists() else ""
-    readme_sections = extract_sections(readme_text)
+    # extract_from_repo aggregates root README plus monorepo subdir READMEs
+    # (backend/, frontend/, services/, etc.) so monorepos surface richer signal.
+    readme_sections = extract_from_repo(repo_root)
     changelog = load_changelog(repo_root)
     decision_docs = [asdict(d) for d in discover_decision_docs(repo_root)]
     stack = detect_stack(repo_root)
