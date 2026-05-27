@@ -1,5 +1,6 @@
 ---
 description: Scan a codebase and generate architecture overview plus module notes into the project hub
+argument-hint: <repo>
 category: vault
 triggers_en: ["architect", "architecture doc", "scan repo", "document architecture", "codebase overview"]
 ---
@@ -8,7 +9,11 @@ Use the obsidian-second-brain skill. Execute `/obsidian-architect $ARGUMENTS`:
 
 The argument is `<repo-path>` (local path or github URL). Optional flags:
 `--project=<P>` (force project hub binding), `--refresh` (explicit refresh),
-`--dry-run` (Phase 1 only, no vault writes), `--force` (ignore "no changes" gate).
+`--dry-run` (Phase 1 only, no vault writes), `--force` (ignore "no changes" gate),
+`--functions=<off|public>` (default off; `public` generates per-function notes
+for symbols on the public API surface), `--skip-sections=<csv>` and
+`--only-sections=<csv>` for surgical regeneration, `--lang=<en|zh-TW>` to
+override the vault default from `_CLAUDE.md`'s `- output-lang:` line.
 
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
@@ -38,6 +43,10 @@ uv run python scripts/architect_scan.py <repo-path> --out /tmp/architect-<hash>/
 ```
 
 This produces `/tmp/architect-<hash>/_manifest.yml` and `scan-report.json`.
+
+The scan-report includes manifest signals AND narrative signals:
+`readme_sections`, `changelog`, `decision_docs`, `stack`, `todos`, `api_surface`,
+`commit_decisions`. Phase 3.5 consumes these.
 
 If `--dry-run`, print the manifest to the user and stop. No vault writes.
 
@@ -98,23 +107,65 @@ For each module in the approved manifest where `excluded: false`:
 4. Update the lockfile's `note_blocks` entry for this note with hashes of the
    newly written generated blocks.
 
-After every non-excluded module is processed: regenerate `overview.md`.
+After every non-excluded module is processed: continue to Phase 3.5, then
+regenerate `overview.md`.
 
-## Overview synthesis
+## Phase 3.5: Per-section synthesis
 
-`Projects/<P>/Architecture/overview.md`:
+Resolve `output_lang`:
 
-- Read every module note's frontmatter plus its `## What it does` block.
-- Read the full file tree, entry points, external deps from
-  `/tmp/architect-<hash>/scan-report.json`.
-- Write the overview with sections in this order: `## For future Claude`,
-  `## Purpose`, `## Layer map` (one Mermaid `graph TD` diagram, or
-  `flowchart LR` if more than 8 top-level nodes), `## Modules` (bullet list
-  with wikilinks), `## Entry points`, `## External dependencies` (with
-  recency markers `(as of YYYY-MM, source-url)`), `## Key abstractions`,
-  `## Related`.
+```bash
+uv run python -c "from scripts.architect.lang import resolve_output_lang; from pathlib import Path; import sys; print(resolve_output_lang(sys.argv[1] or None, Path(sys.argv[2])))" "${LANG_FLAG:-}" "<vault-root>"
+```
 
-All LLM-written sections wrapped in `@generated` sentinels with appropriate names.
+For each section in order (`api-surface`, `features`, `decisions`, `roadmap`,
+`future`), and for each non-skipped section per `--skip-sections` /
+`--only-sections`:
+
+1. Call `scripts.architect.sections.collect_signals(section, scan_report, manifest_modules)` to get the signal subset.
+2. Compute `signal_hash(signal)` and call `scripts.architect.refresh.decide_section_refresh(lock, section=..., current_signal=hash, current_lang=output_lang, force=force, refresh_flag=refresh)`. If SKIP, continue.
+3. For api-surface, use the deterministic table renderers from `scripts.architect.api_surface_render` — no LLM call for the table contents; LLM only writes the `summary` block.
+4. For features / decisions / roadmap / future, build the LLM prompt with `sections.build_prompt(...)`, run it, parse the JSON response into a `{block-name: body}` dict.
+5. Call `sections.compose_note(section=..., generated_blocks=..., output_lang=..., ...)` to assemble the markdown.
+6. Write to `Projects/<P>/Architecture/<filename>`.
+7. Update the lockfile `sections[<name>]` entry with the new `signal-hash`, `lang`, `note-blocks-hash`, and `last-generated` timestamp.
+
+For per-section content rules see `references/ai-first-rules.md` §language and §architecture-*.
+
+If `--functions=public`:
+
+8. Call `scripts.architect.public_surface.eligible_functions(api_surface, module_paths)` to get the candidate list.
+9. For each candidate, run an LLM call to produce the body blocks (`what-it-does`, `inputs-and-outputs`, `behavior-notes`, `callers`).
+10. Call `sections.compose_function_note(...)` and write to `Projects/<P>/Architecture/functions/<module>/<func>.md`.
+11. Update lockfile `functions[<module>/<func>]`.
+
+Failure isolation: if any one section or function synthesis throws, write the note with `status: scan-failed`, record the error in the body, and continue.
+
+## Overview synthesis (Phase 4 — MOC style)
+
+Read every section note's `## Summary` block, plus stack, modules, and entry
+points from the scan-report.
+
+Run an LLM call to produce only the @generated blocks (`purpose`, `layer-map`,
+`external-deps`, `key-abstractions`). The bilingual headings, Capability MOC,
+Structure MOC, and stack body are rendered deterministically by
+`sections.compose_overview()`.
+
+Write the result to `Projects/<P>/Architecture/overview.md`. The frontmatter
+includes `moc-style: true`, the detected `stack:` block (omitted if empty),
+and `lang: <output_lang>`.
+
+`overview.md` body section order (matching `compose_overview`):
+1. `## For future Claude` / `## 給未來 Claude`
+2. `## Purpose` / `## 用途` (LLM block)
+3. `## Stack` / `## 技術棧` (deterministic, mirrors frontmatter)
+4. `## Capability MOC` / `## 能力地圖 MOC` (wikilinks to all 4 narrative sections)
+5. `## API surface` / `## API 介面` (wikilink to api-surface.md)
+6. `## Structure MOC` / `## 結構地圖 MOC` (module wikilinks + entry points)
+7. `## Layer map` / `## 分層圖` (LLM Mermaid block)
+8. `## External dependencies` / `## 外部相依` (LLM block)
+9. `## Key abstractions` / `## 核心抽象` (LLM block)
+10. `## Related` / `## 相關`
 
 ## Data flow note (optional)
 
@@ -126,17 +177,16 @@ chain is detectable - never write speculative data-flow diagrams.
 
 ## Hub note update
 
-Append or replace the `## Architecture` section in `Projects/<P>/<P>.md`:
+Generate the `## Architecture` block via
+`scripts.architect.refresh.render_hub_architecture_block(...)`, passing
+`lang=output_lang`. Append or replace in `Projects/<P>/<P>.md`.
 
-```markdown
-## Architecture
-
-- Overview: [[Architecture/overview]] (last scanned YYYY-MM-DD @ `<commit>`)
-- Modules: N active, M deprecated
-- Refresh: `/obsidian-architect <repo-path> --refresh`
-```
-
+In `en` mode, the heading is `## Architecture`; in `zh-TW`, `## 架構`.
 Idempotent: section exists -> replace in place; otherwise append.
+
+Note: other commands (`/obsidian-project`, `/obsidian-board`) may still
+write English headings into the same hub. Mixed-language is tolerated
+during the cross-command rollout.
 
 ## Daily and operation log
 
@@ -161,3 +211,5 @@ Idempotent: section exists -> replace in place; otherwise append.
 ---
 
 **AI-first rule:** Every note created or updated by this command MUST follow `references/ai-first-rules.md` - `## For future Claude` preamble, rich frontmatter (`type`, `date`, `tags`, `ai-first: true`, plus type-specific fields), recency markers per external claim, mandatory `[[wikilinks]]` for every person/project/concept referenced, sources preserved verbatim with URLs inline, and confidence levels where applicable. The vault is for future-Claude retrieval - not human reading.
+
+**Language:** Respect `_CLAUDE.md`'s `- output-lang: zh-TW` line by default; honor `--lang=` flag as a single-run override. Run `scripts.architect.lang.resolve_output_lang(cli_flag, vault_root)` to get the effective language. All narrative section notes, the overview MOC, modules, and the hub `## Architecture` block must use that language. Code identifiers (paths, function names, CLI commands, URLs) and frontmatter keys/enums/sentinels remain English regardless. See `references/ai-first-rules.md` for the full rule set.
