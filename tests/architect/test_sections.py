@@ -92,7 +92,7 @@ def test_compose_note_wraps_sentinels(tmp_path: Path):
         signal_sources=["README.md", "src/cli.py"],
         confidence="high",
         output_lang="en",
-        generated_blocks={"summary": "We do X.", "capability-map": "- alpha\n- beta"},
+        generated_blocks={"summary": "We do X.", "capability-scope": "- alpha\n- beta"},
     )
     assert note.startswith("---\n")
     assert "type: architecture-features" in note
@@ -101,7 +101,7 @@ def test_compose_note_wraps_sentinels(tmp_path: Path):
     assert "<!-- @generated:start summary -->" in note
     assert "We do X." in note
     assert "<!-- @generated:end summary -->" in note
-    assert "<!-- @generated:start capability-map -->" in note
+    assert "<!-- @generated:start capability-scope -->" in note
 
 
 def test_compose_note_zh_tw_uses_translated_headings():
@@ -133,19 +133,15 @@ def test_compose_note_emits_h2_heading_before_each_block_en():
         output_lang="en",
         generated_blocks={
             "summary": "API surface for x.",
-            "cli-commands": "| Command | ... |",
-            "http-routes": "| Method | ... |",
-            "exports": "| Symbol | ... |",
-            "env-vars": "| Var | ... |",
+            "interface-overview": "5 routes grouped by prefix.",
+            "env-overview": "3 env vars grouped by prefix.",
         },
     )
     # H2 heading appears before each sentinel start.
     for h2, block in [
         ("## Summary", "summary"),
-        ("## CLI commands", "cli-commands"),
-        ("## HTTP routes", "http-routes"),
-        ("## Public exports", "exports"),
-        ("## Environment variables", "env-vars"),
+        ("## Interface overview", "interface-overview"),
+        ("## Environment variables overview", "env-overview"),
     ]:
         assert h2 in note, f"missing H2 heading {h2!r}"
         # Heading must come before the sentinel start, not after.
@@ -165,16 +161,16 @@ def test_compose_note_h2_headings_translate_to_zh_tw():
         output_lang="zh-TW",
         generated_blocks={
             "summary": "x 的介面",
-            "http-routes": "| 方法 | ... |",
-            "env-vars": "| 變數 | ... |",
+            "interface-overview": "依前綴分組",
+            "env-overview": "依前綴分組",
         },
     )
     # zh-TW headings appear; English originals must NOT appear in body.
     assert "## 摘要" in note
-    assert "## HTTP 路由" in note
-    assert "## 環境變數" in note
-    assert "## HTTP routes" not in note
-    assert "## Environment variables" not in note
+    assert "## 介面類型概觀" in note
+    assert "## 環境變數概觀" in note
+    assert "## Interface overview" not in note
+    assert "## Environment variables overview" not in note
 
 
 def test_compose_note_skips_h2_when_block_body_is_empty():
@@ -342,3 +338,22 @@ def test_compose_overview_zh_tw_translates_and_omits_empty_stack():
     assert "## 給未來 Claude" in note
     assert "## 能力地圖 MOC" in note
     assert "stack:" not in note  # empty stack omitted per spec §5.7
+
+
+def test_module_v3_block_names_are_judgment_focused():
+    """v3 drops what-it-does/how-it-works/key-files; adds scope/strengths/weaknesses/improvements."""
+    from scripts.architect.sections import _BLOCK_NAMES
+    assert "module" in _BLOCK_NAMES
+    names = set(_BLOCK_NAMES["module"])
+    assert {"scope", "strengths", "weaknesses", "improvements", "dependencies"} <= names
+    assert "key-files" not in names
+    assert "what-it-does" not in names
+
+
+def test_module_block_headings_translate():
+    """Each v3 module block must have a heading entry."""
+    from scripts.architect.sections import _BLOCK_HEADINGS
+    from scripts.architect.lang import heading
+    for block in ("scope", "strengths", "weaknesses", "improvements", "dependencies"):
+        h_en = _BLOCK_HEADINGS[block]
+        assert heading(h_en, "zh-TW") != h_en, f"{block} heading {h_en!r} has no zh-TW mapping"

@@ -100,6 +100,9 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Personas": {"en": "## Personas", "zh-TW": "## 使用者型態"},
     "## Jobs to be done": {"en": "## Jobs to be done", "zh-TW": "## Jobs to be Done"},
     "## Flows": {"en": "## Flows", "zh-TW": "## 使用流程"},
+    "## Dependencies and consumers": {"en": "## Dependencies and consumers", "zh-TW": "## 相依與被誰使用"},
+    "## Interface overview": {"en": "## Interface overview", "zh-TW": "## 介面類型概觀"},
+    "## Environment variables overview": {"en": "## Environment variables overview", "zh-TW": "## 環境變數概觀"},
 }
 
 

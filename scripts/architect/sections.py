@@ -129,12 +129,18 @@ _PROMPT_LANG_RULES_ZH = (
 
 # Required @generated block names per section (preamble + body composition).
 _BLOCK_NAMES = {
-    "api-surface": ("summary", "cli-commands", "http-routes", "exports", "env-vars"),
-    "features": ("summary", "capability-map", "notable-details"),
+    "api-surface": ("summary", "interface-overview", "env-overview"),
+    "features": ("summary", "capability-scope", "strengths", "weaknesses", "improvements"),
     "decisions": ("summary", "stack-rationale", "detected-adrs", "pattern-decisions",
                   "commit-message-decisions", "promote-to-adr"),
     "roadmap": ("summary", "near-term", "trajectory", "todo-clusters", "signals-reviewed"),
-    "future": ("summary", "known-limitations", "gap-analysis", "aspirational-ideas"),
+    "future": ("summary", "known-limitations", "improvements"),
+    # v3 module-type — judgment-driven, no file recital.
+    "module": ("scope", "strengths", "weaknesses", "improvements", "dependencies"),
+    # v3 product-eye new types
+    "personas": ("summary", "personas-list"),
+    "jobs": ("summary", "jobs-list"),
+    "flows": ("summary", "flows-list"),
 }
 
 # Canonical English H2 heading per @generated block name. Translated at render
@@ -142,29 +148,34 @@ _BLOCK_NAMES = {
 # used in _BLOCK_NAMES so the loop in compose_note() can look them up directly.
 _BLOCK_HEADINGS = {
     "summary": "## Summary",
-    # api-surface
-    "cli-commands": "## CLI commands",
-    "http-routes": "## HTTP routes",
-    "exports": "## Public exports",
-    "env-vars": "## Environment variables",
-    # features
-    "capability-map": "## Capability map",
-    "notable-details": "## Notable details",
-    # decisions
+    # api-surface (v3 — high-level, not full table)
+    "interface-overview": "## Interface overview",
+    "env-overview": "## Environment variables overview",
+    # features (v3)
+    "capability-scope": "## Capability scope",
+    # decisions (unchanged)
     "stack-rationale": "## Stack rationale",
     "detected-adrs": "## Detected ADRs",
     "pattern-decisions": "## Pattern decisions",
     "commit-message-decisions": "## Commit-message decisions",
     "promote-to-adr": "## Promote to ADR",
-    # roadmap
+    # roadmap (unchanged)
     "near-term": "## Near term",
     "trajectory": "## Trajectory",
     "todo-clusters": "## TODO clusters",
     "signals-reviewed": "## Signals reviewed",
-    # future
+    # future (v3 — drops gap-analysis & aspirational-ideas; uses improvements)
     "known-limitations": "## Known limitations",
-    "gap-analysis": "## Gap analysis",
-    "aspirational-ideas": "## Aspirational ideas",
+    # v3 module judgment
+    "scope": "## Module responsibility",
+    "strengths": "## Design strengths",
+    "weaknesses": "## Design weaknesses",
+    "improvements": "## Improvement opportunities",
+    "dependencies": "## Dependencies and consumers",
+    # product-eye
+    "personas-list": "## Personas",
+    "jobs-list": "## Jobs to be done",
+    "flows-list": "## Flows",
 }
 
 
