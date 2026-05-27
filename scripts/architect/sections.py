@@ -253,3 +253,35 @@ def render_signals_reviewed(sources: list[str], todo_counts: dict[str, int], lan
     for slug, n in sorted(todo_counts.items()):
         parts.append(f"- {slug}: {n} {todo_word}" if lang == "en" else f"- {slug}: {n} {todo_word}")
     return "\n".join(parts)
+
+
+def gap_analysis(*, readme_features: str, api_surface: dict) -> list[str]:
+    """Return bullets for features mentioned in README that the scanner could not locate.
+
+    Heuristic: tokenize README feature bullets; check whether ANY surface entry's
+    name/path/handler/symbol contains a normalized token. Bullets with no match
+    become gap candidates.
+    """
+    if not readme_features:
+        return []
+    surface_strings = []
+    for c in api_surface.get("cli_commands", []):
+        surface_strings.append(c.get("name", "").lower())
+        surface_strings.append(c.get("description", "").lower())
+    for r in api_surface.get("http_routes", []):
+        surface_strings.append(r.get("path", "").lower())
+        surface_strings.append(r.get("handler", "").lower())
+    for e in api_surface.get("exports", []):
+        surface_strings.append(e.get("symbol", "").lower())
+    haystack = " ".join(surface_strings)
+
+    gaps: list[str] = []
+    for line in readme_features.splitlines():
+        line = line.strip()
+        if not line.startswith("-"):
+            continue
+        bullet = line.lstrip("- ").strip()
+        tokens = [t for t in bullet.lower().split() if len(t) > 3]
+        if not any(t in haystack for t in tokens):
+            gaps.append(bullet)
+    return gaps

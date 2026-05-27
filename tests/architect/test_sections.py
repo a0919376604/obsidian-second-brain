@@ -163,3 +163,24 @@ def test_render_signals_reviewed_zh():
     out = render_signals_reviewed(sources=["CHANGELOG.md"], todo_counts={"cli": 2}, lang="zh-TW")
     assert "cli:" in out
     assert "2" in out
+
+
+def test_gap_analysis_lists_mentioned_but_not_detected():
+    from scripts.architect.sections import gap_analysis
+    readme_features = "- Streaming HTTP\n- Plugin system\n- gRPC adapter\n"
+    api = {
+        "cli_commands": [],
+        "http_routes": [{"method": "GET", "path": "/items"}],
+        "exports": [{"symbol": "plugin_register", "kind": "named", "source": ""}],
+        "env_vars": [],
+    }
+    gaps = gap_analysis(readme_features=readme_features, api_surface=api)
+    # plugin_register suggests plugin system is implemented; streaming and gRPC are not.
+    text = "\n".join(gaps)
+    assert "Streaming" in text or "streaming" in text
+    assert "gRPC" in text
+
+
+def test_gap_analysis_empty_when_no_readme_features():
+    from scripts.architect.sections import gap_analysis
+    assert gap_analysis(readme_features="", api_surface={}) == []
