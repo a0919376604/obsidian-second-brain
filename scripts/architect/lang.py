@@ -82,6 +82,13 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Inputs and outputs": {"en": "## Inputs and outputs", "zh-TW": "## 輸入輸出"},
     "## Behavior notes": {"en": "## Behavior notes", "zh-TW": "## 行為註記"},
     "## Callers": {"en": "## Callers", "zh-TW": "## 呼叫者"},
+    # roadmap (project-level, by /obsidian-roadmap)
+    "## Themes": {"en": "## Themes", "zh-TW": "## 主題"},
+    "## Stale themes": {"en": "## Stale themes", "zh-TW": "## 過時主題"},
+    "## Synthesis summary": {"en": "## Synthesis summary", "zh-TW": "## 本次合成摘要"},
+    "## Acceptance criteria": {"en": "## Acceptance criteria", "zh-TW": "## 接受條件"},
+    "## Evidence": {"en": "## Evidence", "zh-TW": "## 佐證"},
+    "## Why": {"en": "## Why", "zh-TW": "## 為什麼"},
 }
 
 

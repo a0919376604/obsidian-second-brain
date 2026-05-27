@@ -61,3 +61,19 @@ def test_heading_map_covers_all_required_keys():
     }
     missing = required - set(HEADING_MAP.keys())
     assert not missing, f"missing heading keys: {missing}"
+
+
+def test_heading_map_includes_roadmap_keys():
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        "## Themes": "## 主題",
+        "## Stale themes": "## 過時主題",
+        "## Synthesis summary": "## 本次合成摘要",
+        "## Acceptance criteria": "## 接受條件",
+        "## Evidence": "## 佐證",
+        "## Why": "## 為什麼",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en
