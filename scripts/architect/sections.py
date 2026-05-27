@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -595,3 +597,117 @@ def build_module_prompt(
         "## AGENTS.md excerpt",
         agents_md_excerpt[:5000],
     ])
+
+
+@dataclass
+class ImprovementItem:
+    title: str
+    why: str
+    evidence: list[str]
+    effort: str               # S | M | L | XL
+    risk_if_not_done: str
+    confidence: str           # stated | high | medium | speculation
+
+
+_FIELD_LABELS = {
+    "en": {
+        "Why": "Why",
+        "Evidence": "Evidence",
+        "Effort": "Effort",
+        "Risk if not done": "Risk if not done",
+        "Confidence": "Confidence",
+    },
+    "zh-TW": {
+        "Why": "為什麼",
+        "Evidence": "證據",
+        "Effort": "Effort",
+        "Risk if not done": "未做的風險",
+        "Confidence": "Confidence",
+    },
+}
+
+
+def render_improvements_block(items: list[ImprovementItem], lang: str = "en") -> str:
+    """Render a list of ImprovementItem into the canonical markdown shape.
+
+    Format is strict (see _IMP_RE for the inverse parser):
+      ### Imp <n>: <title>
+      - **Why:** <prose>
+      - **Evidence:** <link1> | <link2>
+      - **Effort:** S|M|L|XL
+      - **Risk if not done:** <prose>
+      - **Confidence:** stated|high|medium|speculation
+    """
+    labels = _FIELD_LABELS.get(lang, _FIELD_LABELS["en"])
+    lines: list[str] = []
+    for i, it in enumerate(items, 1):
+        lines.append(f"### Imp {i}: {it.title}")
+        lines.append(f"- **{labels['Why']}:** {it.why}")
+        evidence_str = " | ".join(it.evidence) if it.evidence else "(none)"
+        lines.append(f"- **{labels['Evidence']}:** {evidence_str}")
+        lines.append(f"- **{labels['Effort']}:** {it.effort}")
+        lines.append(f"- **{labels['Risk if not done']}:** {it.risk_if_not_done}")
+        lines.append(f"- **{labels['Confidence']}:** {it.confidence}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+# Title line.
+_IMP_TITLE_RE = re.compile(r"^###\s+Imp\s+\d+:\s+(.+?)\s*$", re.MULTILINE)
+# Generic bold-prefix bullet:  - **Label:** Body
+_IMP_BULLET_RE = re.compile(r"^-\s+\*\*([^*]+?):\*\*\s*(.+?)\s*$", re.MULTILINE)
+
+
+def parse_improvements_block(text: str) -> list[ImprovementItem]:
+    """Parse a markdown improvements block back into ImprovementItem list.
+
+    Tolerant of zh-TW or en labels. An Imp missing any of the 5 required
+    fields is silently dropped (we refuse partial roadmap candidates).
+    """
+    items: list[ImprovementItem] = []
+    # Split text by Imp title boundaries.
+    parts = _IMP_TITLE_RE.split(text)
+    # _IMP_TITLE_RE.split returns: [before_first, title1, body1, title2, body2, ...]
+    if len(parts) < 3:
+        return []
+    for i in range(1, len(parts), 2):
+        title = parts[i].strip()
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        fields: dict[str, str] = {}
+        for m in _IMP_BULLET_RE.finditer(body):
+            label_raw = m.group(1).strip()
+            value = m.group(2).strip()
+            canonical = _canonicalize_field_label(label_raw)
+            if canonical:
+                fields[canonical] = value
+        required = {"Why", "Evidence", "Effort", "Risk if not done", "Confidence"}
+        if not required.issubset(fields.keys()):
+            continue
+        evidence = [e.strip() for e in fields["Evidence"].split("|") if e.strip()]
+        items.append(ImprovementItem(
+            title=title,
+            why=fields["Why"],
+            evidence=evidence,
+            effort=fields["Effort"],
+            risk_if_not_done=fields["Risk if not done"],
+            confidence=fields["Confidence"],
+        ))
+    return items
+
+
+_LABEL_ALIASES = {
+    # Canonical key -> aliases in either language
+    "Why": {"why", "為什麼"},
+    "Evidence": {"evidence", "證據"},
+    "Effort": {"effort"},
+    "Risk if not done": {"risk if not done", "未做的風險", "risk"},
+    "Confidence": {"confidence"},
+}
+
+
+def _canonicalize_field_label(label_raw: str) -> str | None:
+    needle = label_raw.lower()
+    for canonical, aliases in _LABEL_ALIASES.items():
+        if needle in {a.lower() for a in aliases}:
+            return canonical
+    return None

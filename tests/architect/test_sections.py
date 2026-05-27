@@ -403,3 +403,116 @@ def test_module_prompt_demands_evidence_required_for_each_improvement():
     # And mention the required Imp fields explicitly.
     for field in ("Why", "Evidence", "Effort", "Risk", "Confidence"):
         assert field in prompt, f"missing required Imp field {field!r}"
+
+
+def test_render_improvement_block_uses_strict_h3_format():
+    from scripts.architect.sections import render_improvements_block, ImprovementItem
+    items = [
+        ImprovementItem(
+            title="Extract EventConsumer to separate worker container",
+            why="API process shares CPU with event loop; peak traffic blocks request handling.",
+            evidence=["[[Architecture/decisions#Event routing principle]]",
+                      "`backend/main.py:120`"],
+            effort="M",
+            risk_if_not_done="During campaigns LINE webhook backlog grows; admin UI lags.",
+            confidence="medium",
+        ),
+    ]
+    rendered = render_improvements_block(items, lang="en")
+    assert "### Imp 1: Extract EventConsumer to separate worker container" in rendered
+    assert "- **Why:** API process shares CPU" in rendered
+    assert "- **Evidence:**" in rendered
+    assert "[[Architecture/decisions#Event routing principle]]" in rendered
+    assert "`backend/main.py:120`" in rendered
+    assert "- **Effort:** M" in rendered
+    assert "- **Risk if not done:**" in rendered
+    assert "- **Confidence:** medium" in rendered
+
+
+def test_render_improvement_block_zh_tw():
+    from scripts.architect.sections import render_improvements_block, ImprovementItem
+    items = [
+        ImprovementItem(
+            title="拆 EventConsumer 為獨立 worker",
+            why="API 跟 EventConsumer 共用 process",
+            evidence=["[[Architecture/decisions]]"],
+            effort="M",
+            risk_if_not_done="流量峰值 API 飆延遲",
+            confidence="medium",
+        ),
+    ]
+    rendered = render_improvements_block(items, lang="zh-TW")
+    assert "### Imp 1: 拆 EventConsumer 為獨立 worker" in rendered
+    assert "**為什麼:**" in rendered
+    assert "**證據:**" in rendered
+    assert "**Effort:** M" in rendered
+    assert "**未做的風險:**" in rendered
+    assert "**Confidence:** medium" in rendered
+
+
+def test_parse_improvements_block_round_trips_render():
+    from scripts.architect.sections import (
+        render_improvements_block, parse_improvements_block, ImprovementItem,
+    )
+    items = [
+        ImprovementItem(
+            title="A",
+            why="Because.",
+            evidence=["[[X]]", "`y.py:1`"],
+            effort="S",
+            risk_if_not_done="Bad.",
+            confidence="high",
+        ),
+        ImprovementItem(
+            title="B",
+            why="Why B.",
+            evidence=["[[Z]]"],
+            effort="L",
+            risk_if_not_done="Worse.",
+            confidence="speculation",
+        ),
+    ]
+    rendered = render_improvements_block(items, lang="en")
+    parsed = parse_improvements_block(rendered)
+    assert len(parsed) == 2
+    assert parsed[0].title == "A"
+    assert parsed[0].effort == "S"
+    assert parsed[0].evidence == ["[[X]]", "`y.py:1`"]
+    assert parsed[1].title == "B"
+    assert parsed[1].confidence == "speculation"
+
+
+def test_parse_improvements_block_zh_tw_labels():
+    from scripts.architect.sections import parse_improvements_block
+    text = (
+        "### Imp 1: 拆 EventConsumer 為獨立 worker\n"
+        "- **為什麼:** API 跟 EventConsumer 共用 process\n"
+        "- **證據:** [[Architecture/decisions]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 流量峰值 API 飆延遲\n"
+        "- **Confidence:** medium\n"
+    )
+    items = parse_improvements_block(text)
+    assert len(items) == 1
+    assert items[0].title == "拆 EventConsumer 為獨立 worker"
+    assert items[0].effort == "M"
+    assert items[0].confidence == "medium"
+
+
+def test_parse_improvements_block_skips_malformed():
+    """An Imp with fewer than 5 required fields is dropped, not partially parsed."""
+    from scripts.architect.sections import parse_improvements_block
+    text = (
+        "### Imp 1: Good one\n"
+        "- **Why:** w\n"
+        "- **Evidence:** [[E]]\n"
+        "- **Effort:** S\n"
+        "- **Risk if not done:** r\n"
+        "- **Confidence:** high\n"
+        "\n"
+        "### Imp 2: Missing fields\n"
+        "- **Why:** only this\n"
+    )
+    items = parse_improvements_block(text)
+    assert len(items) == 1
+    assert items[0].title == "Good one"
