@@ -148,3 +148,41 @@ def test_normalize_slug_handles_empty():
     s = normalize_slug("一個全中文的任務")
     assert s.startswith("task-")  # fallback prefix
     assert len(s) > 5
+
+
+def test_append_board_card_to_existing_backlog(tmp_path):
+    from scripts.roadmap.render import append_to_board
+    board = tmp_path / "board.md"
+    board.write_text(
+        "---\n"
+        "type: board\n"
+        "---\n"
+        "\n"
+        "## 待辦\n"
+        "\n"
+        "- [ ] existing card\n"
+        "\n"
+        "## 進行中\n"
+    )
+    appended = append_to_board(board, ["- [ ] new card 1", "- [ ] new card 2"], heading_zh="## 待辦", heading_en="## Backlog")
+    text = board.read_text()
+    assert "- [ ] existing card" in text
+    assert "- [ ] new card 1" in text
+    assert "- [ ] new card 2" in text
+    assert appended == 2
+    # Cards land BEFORE ## 進行中, not after
+    backlog_idx = text.index("## 待辦")
+    inprogress_idx = text.index("## 進行中")
+    new_card_idx = text.index("new card 1")
+    assert backlog_idx < new_card_idx < inprogress_idx
+
+
+def test_append_board_card_creates_backlog_section_if_missing(tmp_path):
+    from scripts.roadmap.render import append_to_board
+    board = tmp_path / "board.md"
+    board.write_text("## 進行中\n\n## 已完成\n")
+    appended = append_to_board(board, ["- [ ] one"], heading_zh="## 待辦", heading_en="## Backlog")
+    text = board.read_text()
+    assert "## 待辦" in text
+    assert "- [ ] one" in text
+    assert appended == 1

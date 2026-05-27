@@ -213,3 +213,35 @@ def normalize_slug(raw: str, max_len: int = 50) -> str:
         h = _hashlib.sha1(raw.encode("utf-8")).hexdigest()[:8]
         return f"task-{h}"
     return s[:max_len].rstrip("-")
+
+
+def append_to_board(board_path, cards: list[str], heading_zh: str = "## 待辦", heading_en: str = "## Backlog") -> int:
+    """Append `cards` (markdown lines) to the board's backlog heading.
+
+    Looks for `heading_zh` first, then `heading_en`. If neither exists,
+    appends a new `heading_zh` section at the end. Cards land at the END of
+    the existing backlog list, just before the next H2 (or EOF).
+
+    Returns the number of cards appended.
+    """
+    from pathlib import Path
+    p = Path(board_path)
+    text = p.read_text(encoding="utf-8")
+    heading = heading_zh if heading_zh in text else (heading_en if heading_en in text else None)
+    if heading is None:
+        # Append new section at end.
+        text = text.rstrip() + "\n\n" + heading_zh + "\n\n" + "\n".join(cards) + "\n"
+        p.write_text(text, encoding="utf-8")
+        return len(cards)
+    # Find heading + the next ## heading (or EOF).
+    h_idx = text.index(heading)
+    body_start = text.index("\n", h_idx) + 1
+    rest = text[body_start:]
+    next_h2 = _re.search(r"\n##\s+", rest)
+    body_end = body_start + (next_h2.start() if next_h2 else len(rest))
+    body = text[body_start:body_end].rstrip()
+    insertion = "\n".join(cards)
+    new_body = (body + "\n" + insertion) if body else insertion
+    text = text[:body_start] + new_body + "\n\n" + text[body_end:].lstrip("\n")
+    p.write_text(text, encoding="utf-8")
+    return len(cards)
