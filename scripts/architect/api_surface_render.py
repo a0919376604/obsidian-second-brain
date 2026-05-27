@@ -74,3 +74,67 @@ def render_env_table(rows: list[dict], lang: str) -> str:
             f"`{r['source']}`",
         ])
     return _table(h, body)
+
+
+def render_interface_overview(http_rows: list[dict], lang: str = "en") -> str:
+    """High-level HTTP route grouping by URL prefix.
+
+    Returns a markdown summary (not the full table). Designed to live in
+    api-surface.md under v3, where the exhaustive table moves out to scan-report.json.
+    """
+    if not http_rows:
+        return ""
+    # Bucket by first URL segment.
+    buckets: dict[str, list[dict]] = {}
+    for r in http_rows:
+        path = r.get("path", "")
+        first = path.lstrip("/").split("/")[0] or "(root)"
+        buckets.setdefault(f"/{first}" if first != "(root)" else "/", []).append(r)
+
+    n = len(http_rows)
+    lines = [f"**{n} routes** grouped by URL prefix:"] if lang == "en" else [f"**{n} 條路由**,以 URL 前綴分組:"]
+    for prefix in sorted(buckets):
+        rows = buckets[prefix]
+        methods = sorted({r.get("method", "") for r in rows})
+        lines.append(f"- `{prefix}` — {len(rows)} routes, methods: {', '.join(methods)}")
+    lines.append("")
+    if lang == "en":
+        lines.append("> Full route table lives in `/tmp/architect-<hash>/scan-report.json` "
+                     "under `api_surface.http_routes`.")
+    else:
+        lines.append("> 完整路由表在 `/tmp/architect-<hash>/scan-report.json` 的 "
+                     "`api_surface.http_routes`。")
+    return "\n".join(lines)
+
+
+def render_env_overview(env_rows: list[dict], lang: str = "en") -> str:
+    """High-level env var grouping by name prefix."""
+    if not env_rows:
+        return ""
+    buckets: dict[str, list[dict]] = {}
+    for r in env_rows:
+        name = r.get("name", "")
+        prefix = name.split("_")[0] if "_" in name else name
+        buckets.setdefault(prefix, []).append(r)
+
+    n = len(env_rows)
+    required_n = sum(1 for r in env_rows if r.get("required"))
+    if lang == "en":
+        lines = [f"**{n} variables** ({required_n} required), grouped by prefix:"]
+    else:
+        lines = [f"**{n} 個變數**({required_n} 個必填),以前綴分組:"]
+    for prefix in sorted(buckets):
+        rows = buckets[prefix]
+        req = sum(1 for r in rows if r.get("required"))
+        if lang == "en":
+            lines.append(f"- `{prefix}_*` — {len(rows)} variables, {req} required")
+        else:
+            lines.append(f"- `{prefix}_*` — {len(rows)} 個,{req} 個必填")
+    lines.append("")
+    if lang == "en":
+        lines.append("> Full env table lives in `/tmp/architect-<hash>/scan-report.json` "
+                     "under `api_surface.env_vars`.")
+    else:
+        lines.append("> 完整環境變數表在 `/tmp/architect-<hash>/scan-report.json` 的 "
+                     "`api_surface.env_vars`。")
+    return "\n".join(lines)
