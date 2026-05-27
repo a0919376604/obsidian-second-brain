@@ -274,7 +274,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 | `/obsidian-review` | Structured weekly or monthly review |
 | `/obsidian-board` | Kanban board view and updates |
 | `/obsidian-project` | Project note with board and daily links |
-| `/obsidian-architect <repo>` | Scan a codebase and write a maintained architecture set (MOC overview, modules, features, roadmap, decisions, future, api-surface) into the project hub; opt-in `--functions=public` layer; supports zh-TW output via vault `_CLAUDE.md` or `--lang`. |
+| `/obsidian-architect` | Judgment-driven architecture documentation (v3). Captures design pros/cons + Evidence-grounded improvement opportunities + product-eye layer (personas/jobs/flows). Feeds `/obsidian-roadmap` Phase 1. |
 | `/obsidian-health` | Vault audit -- contradictions, gaps, stale claims, orphans |
 | `/obsidian-adr` | Decision records -- the vault knows why it's structured this way |
 | `/obsidian-visualize` | Generates a visual canvas map — see the shape of your second brain |

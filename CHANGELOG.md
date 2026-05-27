@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `/obsidian-architect` reframed from description-driven (file-tree recital)
+  to judgment-driven (design strengths / weaknesses / improvement opportunities).
+  Module notes no longer contain `## Key files` sections; the codebase is
+  treated as the source of truth for code structure, and vault notes capture
+  judgment that the codebase does not record.
+- Every Improvement opportunity must cite Evidence (commit SHA, decision
+  wikilink, AGENTS.md section, or `path:line`). LLM is instructed to drop
+  Imps it cannot ground in Evidence rather than speculate.
+- `api-surface.md` reframed from exhaustive HTTP route / export / env tables
+  (17 KB) to high-level prefix-grouped overview (≤ 5 KB). Full tables remain
+  available in `/tmp/architect-<hash>/scan-report.json` for tooling.
+- Lockfile schema bumped to v3 with `frame` marker
+  (`description-v2` legacy vs `judgment-v3` new).
+
+### Added
+
+- `Architecture/personas.md`, `jobs.md`, `flows.md` — product-eye layer
+  capturing who uses the product, what jobs they want done, and the
+  end-to-end flows they traverse. Each is judgment-aware (jobs declare
+  maturity, flows include friction assessment).
+- `--frame=<judgment|description>` flag on `/obsidian-architect`. Default
+  `judgment` (v3). `description` falls back to v2 behaviour for compatibility.
+- `--improvements-per-file=<N>` (default 4) and `--require-evidence` (default
+  true) flags on `/obsidian-architect`.
+- v2 → v3 migration step: drops v2 `@generated` file-tree blocks, preserves
+  `@user` blocks, archives the pre-v3 Architecture/ tree to
+  `_archive/architecture-pre-v3-<timestamp>.tar.gz` as a safety net.
+
+### `/obsidian-roadmap` integration
+
+- Phase 1 (gap detection) now reads `## 改進機會` / `## Improvement opportunities`
+  blocks from every architect file. Each Imp arrives at Phase 3 with full
+  metadata (Why, Evidence, Effort, Risk, Confidence), eliminating the
+  Phase 1 inference step.
+- `Candidate` dataclass extended with optional v3 fields (`why`, `evidence`,
+  `effort`, `risk_if_not_done`, `confidence`). v2 candidates without these
+  fields continue to work.
+
 ### Added
 
 - `/obsidian-roadmap <project>` — synthesize a project Roadmap.md plus
