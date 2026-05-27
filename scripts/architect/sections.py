@@ -37,6 +37,12 @@ SECTION_TYPES = {
     "decisions": "architecture-decisions",
     "roadmap": "architecture-roadmap",
     "future": "architecture-future",
+    # v3 judgment-driven per-module note
+    "module": "architecture-module",
+    # v3 product-eye types
+    "personas": "architecture-personas",
+    "jobs": "architecture-jobs",
+    "flows": "architecture-flows",
 }
 
 
@@ -273,6 +279,10 @@ def _preamble_for(section: str, lang: str) -> str:
             "decisions": "本檔是關鍵技術決定的索引;真正的 ADR 應該透過 /obsidian-adr 升級到 Decisions/。",
             "roadmap": "本檔合成自 CHANGELOG、README、TODO 群組。標明來源,推論值低信心。",
             "future": "本檔是 gap 分析與北極星想法。多為推論,非已決方向。",
+            "module": "本檔是單一模組的判斷式分析(scope / strengths / weaknesses / improvements / dependencies),不重述檔案列表。要做架構決策或 onboarding 從這裡讀。",
+            "personas": "本檔列出推測的使用者/開發者角色,基於 surface area 與功能。多為推論。",
+            "jobs": "本檔列出 codebase 為使用者完成的工作 (jobs to be done)。",
+            "flows": "本檔列出橫跨模組的關鍵使用者流程或資料流。",
         }[section]
     return {
         "api-surface": "This is the API surface reference. Look up commands or endpoints here.",
@@ -280,6 +290,10 @@ def _preamble_for(section: str, lang: str) -> str:
         "decisions": "Index of key technical decisions. Promote individual entries to full ADRs via /obsidian-adr into Decisions/.",
         "roadmap": "Synthesized from CHANGELOG, README, and TODO clusters. Inference is marked.",
         "future": "Gap analysis and north-star ideas. Mostly inferred, not committed.",
+        "module": "Judgment-driven per-module note (scope / strengths / weaknesses / improvements / dependencies). No file recital. Read this before architecture decisions or onboarding.",
+        "personas": "Inferred user/developer personas from surface area and features. Mostly speculation.",
+        "jobs": "Jobs to be done that this codebase fulfills for users.",
+        "flows": "Cross-module user flows or data flows of note.",
     }[section]
 
 
