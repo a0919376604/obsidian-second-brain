@@ -11,6 +11,7 @@ from pathlib import Path
 from scripts.architect.adr import discover_decision_docs
 from scripts.architect.api_surface import detect_api_surface
 from scripts.architect.changelog import load_changelog
+from scripts.architect.commit_decisions import extract_commit_decisions
 from scripts.architect.deps import detect_external_deps
 from scripts.architect.entry_points import detect_entry_points
 from scripts.architect.manifest import Manifest
@@ -72,6 +73,7 @@ def run_phase_one(repo_root: Path) -> ScanResult:
         for slug, items in aggregate_todos(repo_root, module_paths_map).items()
     }
     api_surface = detect_api_surface(repo_root)
+    commit_decisions = [asdict(c) for c in extract_commit_decisions(repo_root, limit=200)]
 
     scan_report = {
         "files": files,
@@ -88,6 +90,7 @@ def run_phase_one(repo_root: Path) -> ScanResult:
         "stack": stack,
         "todos": todos,
         "api_surface": _api_surface_to_dict(api_surface),
+        "commit_decisions": commit_decisions,
     }
 
     return ScanResult(manifest=manifest, scan_report=scan_report)
