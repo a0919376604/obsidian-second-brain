@@ -62,3 +62,64 @@ def _paths_changed_between_commits(
     result = subprocess.run(cmd, capture_output=True)
     # `git diff --quiet` exits 0 on no change, 1 on changes.
     return result.returncode == 1
+
+
+def decide_section_refresh(
+    lock,
+    *,
+    section: str,
+    current_signal: str,
+    current_lang: str,
+    force: bool = False,
+    refresh_flag: bool = False,
+) -> RefreshAction:
+    """Decide what to do with a narrative-section note.
+
+    - First run (no lockfile entry): GENERATE
+    - --force: REGENERATE always
+    - signal or lang differs: REGENERATE
+    - otherwise: SKIP
+
+    `refresh_flag` is reserved for future per-section --refresh semantics; today
+    it is treated identically to no flag (skip on unchanged signal).
+    """
+    from scripts.architect.lockfile import section_signal_was_changed
+    if force:
+        return RefreshAction.REGENERATE
+    if section_signal_was_changed(lock, section, current_signal=current_signal, current_lang=current_lang):
+        record = lock.sections.get(section)
+        return RefreshAction.GENERATE if record is None else RefreshAction.REGENERATE
+    return RefreshAction.SKIP
+
+
+def render_hub_architecture_block(
+    *,
+    commit: str,
+    last_scanned: str,
+    modules_active: int,
+    modules_deprecated: int,
+    repo_path: str,
+    lang: str,
+) -> str:
+    """Render the `## Architecture` block written into Projects/<P>/<P>.md."""
+    if lang == "zh-TW":
+        return "\n".join([
+            "## 架構",
+            "",
+            f"- 總覽: [[Architecture/overview]] (上次掃描 {last_scanned} @ `{commit}`)",
+            f"- 能力: [[Architecture/features]] | [[Architecture/api-surface]]",
+            f"- 方向: [[Architecture/roadmap]] | [[Architecture/future]]",
+            f"- 理由: [[Architecture/decisions]]",
+            f"- 模組: {modules_active} active, {modules_deprecated} deprecated",
+            f"- 重新整理: `/obsidian-architect {repo_path} --refresh`",
+        ])
+    return "\n".join([
+        "## Architecture",
+        "",
+        f"- Overview: [[Architecture/overview]] (last scanned {last_scanned} @ `{commit}`)",
+        f"- Capabilities: [[Architecture/features]] | [[Architecture/api-surface]]",
+        f"- Direction: [[Architecture/roadmap]] | [[Architecture/future]]",
+        f"- Rationale: [[Architecture/decisions]]",
+        f"- Modules: {modules_active} active, {modules_deprecated} deprecated",
+        f"- Refresh: `/obsidian-architect {repo_path} --refresh`",
+    ])
