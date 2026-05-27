@@ -8,18 +8,24 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
 @dataclass
 class Candidate:
-    title: str                    # display text
-    source_wikilink: str          # `[[Architecture/future#期望中的想法]]` style
-    source_line: int              # 1-indexed line in source file
-    kind: str                     # gap | limitation | aspiration | promote-to-adr | todo-cluster
-    raw_text: str                 # original bullet text
-    id: str = ""                  # deterministic, derived from kind + normalized title
+    id: str
+    title: str
+    source_wikilink: str
+    source_line: int
+    kind: str
+    raw_text: str
+    # v3 additions (optional, populated when source is a structured Improvement).
+    why: str | None = None
+    evidence: list[str] = field(default_factory=list)
+    effort: str | None = None
+    risk_if_not_done: str | None = None
+    confidence: str | None = None
 
 
 # Section heading -> (kind, source-file)

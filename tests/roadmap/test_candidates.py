@@ -41,9 +41,9 @@ def test_dedup_by_normalized_title():
     # Two candidates with same text after lowercasing + stripping punct should dedup
     from scripts.roadmap.candidates import Candidate, _dedup
     cands = [
-        Candidate(title="加 SSO 整合", source_wikilink="[[a]]", source_line=1,
+        Candidate(id="gap-a", title="加 SSO 整合", source_wikilink="[[a]]", source_line=1,
                   kind="gap", raw_text="加 SSO 整合"),
-        Candidate(title="加 sso 整合", source_wikilink="[[b]]", source_line=2,
+        Candidate(id="asp-b", title="加 sso 整合", source_wikilink="[[b]]", source_line=2,
                   kind="aspiration", raw_text="加 sso 整合"),
     ]
     result = _dedup(cands)
@@ -62,3 +62,38 @@ def test_candidate_has_stable_id():
     # Re-run yields same IDs
     cands2 = detect_candidates(FIXTURE)
     assert [c.id for c in cands2] == ids
+
+
+def test_candidate_supports_v3_improvement_fields():
+    from scripts.roadmap.candidates import Candidate
+    c = Candidate(
+        id="imp-x",
+        title="Extract worker",
+        source_wikilink="[[modules/backend#改進機會]]",
+        source_line=0,
+        kind="improvement",
+        raw_text="full body",
+        why="Because.",
+        evidence=["[[a]]"],
+        effort="M",
+        risk_if_not_done="Bad.",
+        confidence="medium",
+    )
+    assert c.why == "Because."
+    assert c.effort == "M"
+    assert c.confidence == "medium"
+
+
+def test_candidate_v2_fields_still_work():
+    """Existing v2 candidates without Imp metadata still construct fine."""
+    from scripts.roadmap.candidates import Candidate
+    c = Candidate(
+        id="gap-x",
+        title="A gap",
+        source_wikilink="[[Architecture/future#落差分析]]",
+        source_line=10,
+        kind="gap",
+        raw_text="...",
+    )
+    assert c.why is None
+    assert c.effort is None
