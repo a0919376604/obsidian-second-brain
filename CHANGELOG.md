@@ -19,6 +19,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   heuristics, manifest read/write, lockfile, sentinel parser, refresh decision).
 - `references/ai-first-rules.md`: documented three new `type:` values:
   `architecture-overview`, `architecture-module`, `architecture-data-flow`.
+- `/obsidian-architect` now produces narrative section notes alongside the
+  module deep-dives: `features.md`, `roadmap.md`, `decisions.md`,
+  `future.md`, and `api-surface.md`. `overview.md` becomes a MOC with a
+  `stack:` frontmatter block.
+- Optional function-level layer via `--functions=public` writes
+  `Architecture/functions/<module>/<func>.md` for public-surface symbols.
+- `--skip-sections=<csv>` and `--only-sections=<csv>` for surgical
+  section regeneration; `--lang=<zh-TW|en>` for per-call language
+  override. Vault-wide default lives in `_CLAUDE.md` as
+  `- output-lang: zh-TW`.
 
 ### Fixed
 
@@ -71,6 +81,14 @@ for a v1.1 follow-up:
 
 ### Changed
 
+- Lockfile schema bumped to v2: adds `sections` and `functions` blocks,
+  plus a `lang` field per entry. v1 lockfiles migrate silently (first
+  v2 run regenerates all sections once; module entries are preserved).
+- `references/ai-first-rules.md` documents 5 new `type:` values
+  (`architecture-features`, `architecture-roadmap`, `architecture-decisions`,
+  `architecture-future`, `architecture-api-surface`), 1 optional
+  (`architecture-function`), and the language preamble that governs all
+  generated notes.
 - **Project-scoped vault routing**: 14 slash commands now accept `--project=<name>` and route writes to `Projects/<name>/{Ideas,Tasks,Decisions,Learnings,Research,Recaps}/` sub-folders. Without the flag, default behavior is preserved (writes to vault root). See `docs/superpowers/specs/2026-05-25-vault-hybrid-architecture-and-pipeline-design.md` for the design rationale.
 - **`/obsidian-adr` retargeted**: ADRs now write to `Projects/<P>/Decisions/` (was `Knowledge/ADR-...`). Aligns with industry convention. ADR template now includes "What would change my mind" field.
 - **`/obsidian-learn` gains `--capture` mode**: write a single learning at the moment of insight (Checkpoint 3 in the spec). The original review-mode is still the default.

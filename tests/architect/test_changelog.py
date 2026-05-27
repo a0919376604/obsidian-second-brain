@@ -12,6 +12,12 @@ def test_parses_unreleased_block():
     assert "Crash on startup" in cl.unreleased
 
 
+def test_parses_bracketed_unreleased_block():
+    cl = parse_changelog("# Changelog\n\n## [Unreleased]\n\n- Foo\n")
+    assert cl.unreleased is not None
+    assert "Foo" in cl.unreleased
+
+
 def test_recent_versions_up_to_three():
     cl = parse_changelog(FIXTURE.read_text())
     assert len(cl.recent_versions) == 3

@@ -37,7 +37,7 @@ def parse_changelog(text: str) -> Changelog:
         body_start = m.end()
         body_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         body = text[body_start:body_end].strip()
-        if title.lower() == "unreleased":
+        if title.strip("[]").lower() == "unreleased":
             cl.unreleased = body
             continue
         vm = _VERSION_RE.match(title)

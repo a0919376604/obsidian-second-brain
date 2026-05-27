@@ -527,12 +527,14 @@ Steps:
 
 **Codebase architecture documentation.**
 
-- INPUT: repo path (or github URL) and optional `--project=<P>` flag
-- PROCESS: Phase 1 Python scanner (file tree, language stats, entry points,
-  dep extraction, module proposal heuristics) -> Phase 2 user manifest review
-  -> Phase 3 LLM synthesis per module + overview using `repomix` for packing
-- OUTPUT: `Projects/<P>/Architecture/{_manifest.yml, overview.md, modules/<slug>.md, data-flow.md}`
-- PROPAGATION: Updates project hub's `## Architecture` section + daily note + operation log
+- `/obsidian-architect <repo-path>` — scans a repo and writes a maintained
+  architecture document set under `Projects/<P>/Architecture/`: a MOC
+  `overview.md` with a detected `stack:` block; per-module deep notes
+  under `modules/`; narrative section notes (`features`, `api-surface`,
+  `decisions`, `roadmap`, `future`); optional function-level notes via
+  `--functions=public`. Refresh is the same command re-run; per-section
+  signal hashing skips unchanged work. Vault language defaults from
+  `_CLAUDE.md`'s `- output-lang:` line; override with `--lang=`.
 
 ---
 
