@@ -120,6 +120,81 @@ def test_compose_note_zh_tw_uses_translated_headings():
     assert "lang: zh-TW" in note
 
 
+def test_compose_note_emits_h2_heading_before_each_block_en():
+    """Each @generated block must be preceded by its canonical H2 heading,
+    so Obsidian's outline + wikilink anchors work and the body is human-readable."""
+    note = compose_note(
+        section="api-surface",
+        project="x",
+        repo_label="github.com/x/y",
+        commit="a",
+        signal_sources=["a"],
+        confidence="high",
+        output_lang="en",
+        generated_blocks={
+            "summary": "API surface for x.",
+            "cli-commands": "| Command | ... |",
+            "http-routes": "| Method | ... |",
+            "exports": "| Symbol | ... |",
+            "env-vars": "| Var | ... |",
+        },
+    )
+    # H2 heading appears before each sentinel start.
+    for h2, block in [
+        ("## Summary", "summary"),
+        ("## CLI commands", "cli-commands"),
+        ("## HTTP routes", "http-routes"),
+        ("## Public exports", "exports"),
+        ("## Environment variables", "env-vars"),
+    ]:
+        assert h2 in note, f"missing H2 heading {h2!r}"
+        # Heading must come before the sentinel start, not after.
+        h2_idx = note.index(h2)
+        sentinel_idx = note.index(f"<!-- @generated:start {block} -->")
+        assert h2_idx < sentinel_idx, f"{h2!r} appears after its sentinel"
+
+
+def test_compose_note_h2_headings_translate_to_zh_tw():
+    note = compose_note(
+        section="api-surface",
+        project="x",
+        repo_label="github.com/x/y",
+        commit="a",
+        signal_sources=["a"],
+        confidence="high",
+        output_lang="zh-TW",
+        generated_blocks={
+            "summary": "x 的介面",
+            "http-routes": "| 方法 | ... |",
+            "env-vars": "| 變數 | ... |",
+        },
+    )
+    # zh-TW headings appear; English originals must NOT appear in body.
+    assert "## 摘要" in note
+    assert "## HTTP 路由" in note
+    assert "## 環境變數" in note
+    assert "## HTTP routes" not in note
+    assert "## Environment variables" not in note
+
+
+def test_compose_note_skips_h2_when_block_body_is_empty():
+    """If a block has no body, neither the H2 nor the sentinels should appear."""
+    note = compose_note(
+        section="features",
+        project="x",
+        repo_label="github.com/x/y",
+        commit="a",
+        signal_sources=["a"],
+        confidence="high",
+        output_lang="en",
+        generated_blocks={"summary": "Yes."},  # capability-map + notable-details intentionally omitted
+    )
+    assert "## Summary" in note
+    assert "## Capability map" not in note
+    assert "## Notable details" not in note
+    assert "<!-- @generated:start capability-map -->" not in note
+
+
 def test_compose_note_insufficient_signal_status():
     note = compose_note(
         section="future",

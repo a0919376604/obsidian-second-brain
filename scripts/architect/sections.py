@@ -137,6 +137,36 @@ _BLOCK_NAMES = {
     "future": ("summary", "known-limitations", "gap-analysis", "aspirational-ideas"),
 }
 
+# Canonical English H2 heading per @generated block name. Translated at render
+# time via lang.heading() for zh-TW vaults. Keys are the SAME slug-style names
+# used in _BLOCK_NAMES so the loop in compose_note() can look them up directly.
+_BLOCK_HEADINGS = {
+    "summary": "## Summary",
+    # api-surface
+    "cli-commands": "## CLI commands",
+    "http-routes": "## HTTP routes",
+    "exports": "## Public exports",
+    "env-vars": "## Environment variables",
+    # features
+    "capability-map": "## Capability map",
+    "notable-details": "## Notable details",
+    # decisions
+    "stack-rationale": "## Stack rationale",
+    "detected-adrs": "## Detected ADRs",
+    "pattern-decisions": "## Pattern decisions",
+    "commit-message-decisions": "## Commit-message decisions",
+    "promote-to-adr": "## Promote to ADR",
+    # roadmap
+    "near-term": "## Near term",
+    "trajectory": "## Trajectory",
+    "todo-clusters": "## TODO clusters",
+    "signals-reviewed": "## Signals reviewed",
+    # future
+    "known-limitations": "## Known limitations",
+    "gap-analysis": "## Gap analysis",
+    "aspirational-ideas": "## Aspirational ideas",
+}
+
 
 def build_prompt(section: str, signal: dict, output_lang: str, project: str) -> str:
     """Render the LLM prompt for a section synthesis."""
@@ -205,6 +235,12 @@ def compose_note(
         body = generated_blocks.get(name, "").strip()
         if not body:
             continue
+        # Emit the section's H2 heading BEFORE the sentinel so the note has real
+        # navigable structure. Wikilinks can target `[[file#<heading>]]` and the
+        # Obsidian outline shows each section. Heading is bilingual-aware via
+        # lang.heading(); falls back to the slug if no mapping exists.
+        canonical_h2 = _BLOCK_HEADINGS.get(name, f"## {name}")
+        body_parts.append(heading(canonical_h2, output_lang))
         body_parts.append(f"<!-- @generated:start {name} -->")
         body_parts.append(body)
         body_parts.append(f"<!-- @generated:end {name} -->")
