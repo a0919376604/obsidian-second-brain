@@ -144,3 +144,22 @@ def test_module_for_path_returns_slug():
     assert module_for_path("src/auth/login.py", manifest) == "auth"
     assert module_for_path("src/api/routes.py", manifest) == "api"
     assert module_for_path("random/orphan.py", manifest) is None
+
+
+def test_render_signals_reviewed_en():
+    from scripts.architect.sections import render_signals_reviewed
+    out = render_signals_reviewed(
+        sources=["CHANGELOG.md", "README.md#Roadmap"],
+        todo_counts={"cli": 3, "api": 1},
+        lang="en",
+    )
+    assert "CHANGELOG.md" in out
+    assert "README.md#Roadmap" in out
+    assert "cli: 3 TODOs" in out
+
+
+def test_render_signals_reviewed_zh():
+    from scripts.architect.sections import render_signals_reviewed
+    out = render_signals_reviewed(sources=["CHANGELOG.md"], todo_counts={"cli": 2}, lang="zh-TW")
+    assert "cli:" in out
+    assert "2" in out

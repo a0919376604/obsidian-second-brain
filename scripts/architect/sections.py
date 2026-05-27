@@ -242,3 +242,14 @@ def module_for_path(rel_path: str, manifest_modules: list[dict]) -> str | None:
             if src == prefix or src.startswith(prefix.rstrip("/") + "/"):
                 return m["slug"]
     return None
+
+
+def render_signals_reviewed(sources: list[str], todo_counts: dict[str, int], lang: str) -> str:
+    """Emit the deterministic 'Signals reviewed' tail block."""
+    todo_word = "TODOs" if lang == "en" else "個 TODO"
+    parts = []
+    for src in sources:
+        parts.append(f"- `{src}`")
+    for slug, n in sorted(todo_counts.items()):
+        parts.append(f"- {slug}: {n} {todo_word}" if lang == "en" else f"- {slug}: {n} {todo_word}")
+    return "\n".join(parts)
