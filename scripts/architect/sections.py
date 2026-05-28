@@ -1112,6 +1112,97 @@ def build_features_prompt(
     ])
 
 
+def render_features_inventory(
+    llm_inventory: list[dict],
+    api_surface: dict,
+    git_last_touch: dict[str, str],
+) -> tuple[str, dict[str, int]]:
+    """Two-pass annotation: mark each LLM-provided capability row online/deprecated,
+    then render as markdown table.
+
+    Returns (table_markdown, summary_counts) where summary_counts has keys
+    'online' and 'deprecated'.
+    """
+    # Build searchable set of (file, endpoint_or_symbol) from api_surface.
+    surface_anchors: set[tuple[str, str]] = set()
+    for route in api_surface.get("http_routes", []):
+        f = _api_surface_entry_file(route)
+        p = route.get("path", "")
+        if f and p:
+            surface_anchors.add((f, p))
+    for cmd in api_surface.get("cli_commands", []):
+        f = _api_surface_entry_file(cmd)
+        n = cmd.get("name", "")
+        if f and n:
+            surface_anchors.add((f, n))
+    for exp in api_surface.get("exports", []):
+        f = _api_surface_entry_file(exp)
+        n = exp.get("name", "") or exp.get("symbol", "")
+        if f and n:
+            surface_anchors.add((f, n))
+
+    rows_rendered: list[str] = []
+    counts = {"online": 0, "deprecated": 0}
+
+    for row in llm_inventory:
+        name = (row.get("name") or "").strip() or "(unnamed)"
+        description = (row.get("description") or "").strip()
+        if len(description) > 80:
+            description = description[:77] + "…"
+        code_anchors = row.get("code_anchors") or []
+        doc_anchors = row.get("doc_anchors") or []
+        module = (row.get("module") or "").strip()
+
+        status, last_touch = _resolve_row_status(code_anchors, surface_anchors, git_last_touch)
+        counts[status] += 1
+
+        code_cell = "<br>".join(f"`{c}`" for c in code_anchors) or "—"
+        doc_cell = "<br>".join(doc_anchors) or "—"
+        module_cell = f"[[modules/{module}]]" if module else "—"
+        rows_rendered.append(
+            f"| {name} | {description} | {status} | {last_touch} | {doc_cell} | {code_cell} | {module_cell} |"
+        )
+
+    header = (
+        "| Capability | Description | Status | Last touch | Doc anchors | Code anchors | Module |\n"
+        "| --- | --- | --- | --- | --- | --- | --- |"
+    )
+    table = "\n".join([header, *rows_rendered])
+    return table, counts
+
+
+def _resolve_row_status(
+    code_anchors: list[str],
+    surface_anchors: set[tuple[str, str]],
+    git_last_touch: dict[str, str],
+) -> tuple[str, str]:
+    """Returns (status, last_touch_cell). status ∈ {'online', 'deprecated'}."""
+    matched_files: list[str] = []
+    for anchor in code_anchors:
+        if ":" not in anchor:
+            continue
+        file_part, _, endpoint_or_symbol = anchor.partition(":")
+        if (file_part, endpoint_or_symbol) in surface_anchors:
+            matched_files.append(file_part)
+    if not matched_files:
+        return ("deprecated", "—")
+
+    dates = [git_last_touch.get(f) for f in matched_files if git_last_touch.get(f)]
+    if not dates:
+        return ("online", "unknown")
+    return ("online", max(dates))
+
+
+def _api_surface_entry_file(entry: dict) -> str:
+    file_value = entry.get("file")
+    if file_value:
+        return file_value
+    source = entry.get("source") or ""
+    if ":" not in source:
+        return source
+    return source.rsplit(":", 1)[0]
+
+
 def render_prompts_block(
     inventory: list[dict],
     annotations: dict[str, dict],

@@ -206,3 +206,75 @@ def test_build_features_prompt_personas_directive_only_when_provided():
     )
     assert "Persona Mary" in with_p
     assert "Persona Mary" not in no_p
+
+
+def test_render_features_inventory_marks_online_when_anchor_in_api_surface():
+    """LLM row with code_anchor matching api_surface → status=online."""
+    from scripts.architect.sections import render_features_inventory
+
+    inventory = [
+        {
+            "name": "Login",
+            "description": "Admin login",
+            "code_anchors": ["backend/app/api/auth.py:/login"],
+            "doc_anchors": ["README.md#Auth"],
+            "module": "backend",
+        }
+    ]
+    api_surface = {
+        "http_routes": [{"path": "/login", "method": "POST",
+                          "file": "backend/app/api/auth.py"}],
+        "cli_commands": [],
+        "exports": [],
+    }
+    git_last_touch = {"backend/app/api/auth.py": "2026-05-20"}
+    md, summary = render_features_inventory(inventory, api_surface, git_last_touch)
+    assert "| online |" in md
+    assert "2026-05-20" in md
+    assert summary["online"] == 1
+    assert summary["deprecated"] == 0
+
+
+def test_render_features_inventory_marks_deprecated_when_no_anchor_matches():
+    """LLM row with code_anchor NOT in api_surface → status=deprecated."""
+    from scripts.architect.sections import render_features_inventory
+
+    inventory = [
+        {
+            "name": "Old endpoint",
+            "description": "removed",
+            "code_anchors": ["backend/api/old.py:/v1/old"],
+            "doc_anchors": ["README.md#Legacy"],
+            "module": "backend",
+        }
+    ]
+    api_surface = {"http_routes": [], "cli_commands": [], "exports": []}
+    md, summary = render_features_inventory(inventory, api_surface, {})
+    assert "| deprecated |" in md
+    # Last touch column for deprecated is em-dash.
+    assert "| — |" in md or "| - |" in md
+    assert summary["online"] == 0
+    assert summary["deprecated"] == 1
+
+
+def test_render_features_inventory_last_touch_unknown_for_missing_git_key():
+    """When code_anchor's file isn't in git_last_touch, last_touch column = 'unknown'."""
+    from scripts.architect.sections import render_features_inventory
+
+    inventory = [
+        {
+            "name": "Recent",
+            "description": "x",
+            "code_anchors": ["backend/app/new.py:/new"],
+            "doc_anchors": [],
+            "module": "backend",
+        }
+    ]
+    api_surface = {
+        "http_routes": [{"path": "/new", "method": "POST",
+                          "file": "backend/app/new.py"}],
+        "cli_commands": [],
+        "exports": [],
+    }
+    md, _ = render_features_inventory(inventory, api_surface, git_last_touch={})
+    assert "unknown" in md
