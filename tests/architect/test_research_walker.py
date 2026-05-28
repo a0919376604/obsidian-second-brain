@@ -35,3 +35,38 @@ def test_ordered_by_date_desc():
     assert excerpts[0]["date"] >= excerpts[-1]["date"]
     # A (2026-04) before B (2026-03)
     assert excerpts[0]["path"].endswith("A.md")
+
+
+def test_returns_empty_when_dir_missing(tmp_path):
+    """No Research/ subdir → empty list, no crash."""
+    assert collect_research_excerpts(tmp_path) == []
+
+
+def test_caps_at_max_files(tmp_path):
+    """When >10 research notes exist, return only 10 (most recent dates)."""
+    research = tmp_path / "Research"
+    research.mkdir()
+    for i in range(15):
+        # date format YYYY-MM-DD; use month MM = i+1 (Jan = 01, etc.) padded.
+        month = f"{(i % 12) + 1:02d}"
+        (research / f"note-{i:02d}.md").write_text(
+            f"---\ntitle: Note {i}\ndate: 2026-{month}-01\ntags: []\n---\n\n"
+            f"Body paragraph for note {i}.\n",
+            encoding="utf-8",
+        )
+    excerpts = collect_research_excerpts(tmp_path)
+    assert len(excerpts) == 10
+
+
+def test_skips_notes_without_frontmatter(tmp_path):
+    """Markdown files without `---` frontmatter are skipped (treated as junk)."""
+    research = tmp_path / "Research"
+    research.mkdir()
+    (research / "no-fm.md").write_text("Just a paragraph, no frontmatter.\n", encoding="utf-8")
+    (research / "with-fm.md").write_text(
+        "---\ntitle: T\ndate: 2026-05-01\ntags: []\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    excerpts = collect_research_excerpts(tmp_path)
+    assert len(excerpts) == 1
+    assert excerpts[0]["title"] == "T"
