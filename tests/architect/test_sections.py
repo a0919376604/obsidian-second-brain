@@ -775,3 +775,24 @@ def test_compose_note_warns_on_deprecated_section(caplog):
     assert "features" in caplog.text.lower()
     # Note still produced (backward compat).
     assert "type: architecture-features" in note
+
+
+def test_compose_decisions_emits_known_limitations_block():
+    from scripts.architect.sections import compose_note
+    note = compose_note(
+        section="decisions",
+        project="x",
+        repo_label="local: /tmp/x",
+        commit="a",
+        signal_sources=[],
+        confidence="medium",
+        output_lang="zh-TW",
+        generated_blocks={
+            "summary": "Decisions index.",
+            "stack-rationale": "- React + FastAPI",
+            "known-limitations": "- backend/.env deprecated\n- plain-text password fallback",
+        },
+    )
+    assert "## 已知限制" in note
+    assert "@generated:start known-limitations" in note
+    assert "backend/.env deprecated" in note
