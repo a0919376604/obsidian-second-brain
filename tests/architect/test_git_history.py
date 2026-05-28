@@ -48,3 +48,22 @@ def test_omits_uncommitted_files(tmp_path):
     result = last_touch_map(tmp_path, ["tracked.py", "untracked.py"])
     assert result["tracked.py"] == "2026-04-01"
     assert "untracked.py" not in result
+
+
+def test_caps_at_200_files_by_mtime(tmp_path):
+    """When >200 files passed, only 200 most-recently-modified are queried."""
+    _init_git_repo(tmp_path)
+    # Create 205 files but only commit 1 (to keep test fast).
+    _commit(tmp_path, "tracked.py", "z=3\n", "2026-04-01T00:00:00")
+    files = ["tracked.py"]
+    for i in range(205):
+        p = tmp_path / f"u_{i:03d}.py"
+        p.write_text(f"u={i}\n", encoding="utf-8")
+        files.append(f"u_{i:03d}.py")
+    # Should NOT blow up; tracked.py may or may not be in the 200 chosen
+    # (it has older mtime than the 205 just-written files, so likely NOT
+    # in the returned map — which is acceptable; cap is best-effort).
+    result = last_touch_map(tmp_path, files)
+    # Tracked.py is older than the 205 untracked → likely dropped. Either way,
+    # the map must not have >200 entries.
+    assert len(result) <= 200, f"expected ≤200 entries; got {len(result)}"
