@@ -1,3 +1,40 @@
+## Resolution log
+
+All five plan-vs-actual mismatches captured during the codex run were resolved in-stream:
+
+**Task 1 Step 2** — Expected 5 FAILS, got 3 FAILS + 2 PASSED. The 2 unexpected passes
+(`test_features_section_type_present`, `test_features_v4_2_block_headings_present`)
+were because the existing v3 entries in `SECTION_TYPES` and `_BLOCK_HEADINGS` already
+satisfied those assertions. The RED-state failures still pointed at the v4.2-missing
+behavior. No fix needed — TDD discipline preserved (intent was a red signal on v4.2
+gaps, which we got).
+
+**Task 1 Step 7** — 3 legacy v3-era tests in `tests/architect/test_sections.py` broke
+when `features` un-deprecated. Resolved as part of commit `1dfe834`:
+- `test_compose_note_wraps_sentinels` — updated to use `capability-inventory` block
+  name instead of legacy `capability-scope`.
+- `test_deprecated_section_types_marked` — removed `features` from the assertion list.
+- `test_compose_note_warns_on_deprecated_section` — switched fixture to use
+  `api-surface` (still deprecated) instead of `features`.
+
+**Tasks 2 / 4 Step ~3** — Plan expected N test FAILS with `ModuleNotFoundError`; pytest
+actually emitted 1 collection ERROR (stops at import before running tests). Same root
+cause (missing module), same outcome once impl lands. Pytest behavior quirk only.
+
+**Task 6 Step 3** — Plan referenced `build_scan_report`; the actual codebase exposes
+`run_phase_one`. Test imports updated to the real name. Functional intent identical.
+
+**Task 13 Step 2** — The dedup test as written didn't exercise the dedup path because
+the module-Imp parser only matches `### Imp N: ...` titled headings. Codex rewrote the
+test with `### Imp 1: Streaming reply tech impl` so the module candidate is actually
+emitted and then deduped by the features-evidence-wikilink overlap pass. Dedup path
+covered.
+
+Final acceptance: 354 tests pass; all 4 platform adapters build; `Phase 3.5.5` appears
+3 times in command body; scan smoke against `langlive-line-oa` produces non-empty
+`agents_md_text`, `git_last_touch`, and `research_excerpts: []` (the project's
+`Research/` dir is empty).
+
 # obsidian-architect v4.2 (features.md — Product PM lens) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
