@@ -969,6 +969,149 @@ def build_ai_flow_prompt(
     ])
 
 
+def build_features_prompt(
+    *,
+    project: str,
+    readme_sections: dict,
+    agents_md_text: str,
+    changelog: dict,
+    api_surface_summary: str,
+    modules_summary: str,
+    personas_summary: str,
+    research_excerpts: list[dict],
+    output_lang: str,
+) -> str:
+    """v4.2 — features.md (Product PM lens) synthesis prompt.
+
+    Asks the LLM for strict JSON with 10 block keys. `capability-inventory`
+    is a STRUCTURED LIST (not markdown table) — post-processor renders the
+    table after deterministically annotating online/deprecated status via
+    api_surface lookup.
+    """
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫散文。"
+            "Code identifier (檔案路徑、變數名、函式名、CLI 命令、URL、wikilink 內檔名段) 一律保留英文。"
+        )
+        improvement_shape_label = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = (
+            "Write all prose in English. Code identifiers, paths, function names, "
+            "CLI commands, URLs, and wikilink filename parts stay verbatim."
+        )
+        improvement_shape_label = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    research_block_lines: list[str] = []
+    if research_excerpts:
+        research_block_lines.append("## Research excerpts (use as Evidence for missing-features)")
+        for r in research_excerpts:
+            research_block_lines.append(
+                f"- **{r['title']}** ({r['date']}, tags={r.get('tags', [])}, path=`{r['path']}`)"
+            )
+            research_block_lines.append(f"  > {r['first_para']}")
+    research_section = "\n".join(research_block_lines) if research_block_lines else (
+        "## Research excerpts\n(none in vault — `missing-features` Evidence "
+        "must fall back to persona job / code-pattern / mark Confidence=speculation)"
+    )
+
+    personas_block = (
+        f"## Personas summary\n{personas_summary}"
+        if personas_summary.strip()
+        else "## Personas summary\n(no personas.md yet — SKIP `product-coverage` block; "
+        "emit it as empty string in JSON)"
+    )
+
+    return "\n".join([
+        f"You are documenting the **product PM lens** for project `{project}`.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. `capability-inventory` MUST be a structured list of dicts (NOT markdown table). "
+        "Each row: `{\"name\": \"...\", \"description\": \"≤80 char\", "
+        "\"code_anchors\": [\"path:endpoint\" or \"path:symbol\", ...], "
+        "\"doc_anchors\": [\"README.md#Section\" or \"AGENTS.md L17-19\" or \"CHANGELOG#unreleased\", ...], "
+        "\"module\": \"<host module slug>\"}`. A deterministic post-processor renders "
+        "this list into a markdown table and assigns `online`/`deprecated` status.",
+        "2. `strengths` / `weaknesses` MUST use PM voice. Banned: 'god module', 'refactor', "
+        "'type safety', 'test coverage'. Allowed: '客服 onboarding 路徑暢通', '單一 channel 假設', "
+        "'報表足以打董事會月會'. Tight bullet shape: `**Title (≤30 char).** clarification (≤80 char)`.",
+        "3. `missing-features` Evidence must be one of: `[[Research/<note>]]` wikilink to vault "
+        "research note, `[[Architecture/personas#<persona>]]` pointer, or `code:path:line` pattern. "
+        "If no evidence is available, set `Confidence: speculation`. Drop Imps with no rationale.",
+        "4. `limitations` are OBJECTIVE product boundaries (channel coverage, scaling caps, "
+        "integration requirements). Not opinions. Each bullet may cite `code:path:line` or env var.",
+        "5. `doc-sync-actions` block has 2 H3 groups: `### 清除 deprecated 殘留` + `### 補缺 doc`. "
+        "Use checkbox shape `- [ ] <action>` so users can tick off.",
+        "",
+        "## Output: produce 10 @generated blocks (JSON keys)",
+        "",
+        "### `summary`",
+        "1 short paragraph. What the product does; total capability count; "
+        "doc-sync health line ('X aligned, Y deprecated, Z missing docs').",
+        "",
+        "### `capability-inventory`",
+        "STRUCTURED LIST of dicts as described in Critical rule 1. Aim for 25-40 rows. "
+        "Include 1-2 KNOWN-deprecated entries when you can spot them (README mentions an "
+        "endpoint that doesn't appear in api_surface — list it; status is assigned later).",
+        "",
+        "### `product-coverage`",
+        "PM lens aligning capabilities to persona jobs. For each persona, list which "
+        "capability areas their typical jobs hit. Mark gaps: ✅ covered / ⚠️ partial / ❌ missing.",
+        "",
+        "### `limitations`",
+        "3-7 objective product-boundary bullets per Critical rule 4.",
+        "",
+        "### `strengths`",
+        "3-5 PM-voice tight bullets per Critical rule 2.",
+        "",
+        "### `weaknesses`",
+        "3-5 PM-voice tight bullets per Critical rule 2. Examples of pain perspectives.",
+        "",
+        "### `missing-features`",
+        "3-5 H3 entries; shape:",
+        f"  {improvement_shape_label}",
+        "  + **對哪個 module 開門:** `[[modules/<slug>]]`",
+        "Evidence per Critical rule 3.",
+        "",
+        "### `improvements`",
+        f"3-5 Imps with standard ImprovementItem shape: {improvement_shape_label}. "
+        "**PRODUCT direction**, not technical refactor.",
+        "",
+        "### `doc-sync-actions`",
+        "2 H3 groups per Critical rule 5. Machine-actionable checkbox lines.",
+        "",
+        "### `dependencies`",
+        "Wikilinks only: `[[Architecture/overview]]`, each referenced "
+        "`[[Architecture/modules/<slug>]]`, `[[Architecture/personas]]`, each referenced "
+        "`[[Architecture/ai-flows/<slug>]]`, each `[[Research/<note>]]` you used as Evidence.",
+        "",
+        "Return strict JSON: {\"summary\": \"...\", \"capability-inventory\": [...], "
+        "\"product-coverage\": \"...\", \"limitations\": \"...\", \"strengths\": \"...\", "
+        "\"weaknesses\": \"...\", \"missing-features\": \"...\", \"improvements\": \"...\", "
+        "\"doc-sync-actions\": \"...\", \"dependencies\": \"...\"}.",
+        "",
+        "## README sections",
+        "\n".join(f"- {k}: {v[:200]}" for k, v in (readme_sections or {}).items()) or "(empty)",
+        "",
+        "## AGENTS.md (capped)",
+        agents_md_text[:5000] or "(empty)",
+        "",
+        "## CHANGELOG",
+        str(changelog)[:3000],
+        "",
+        "## API surface summary",
+        api_surface_summary[:3000],
+        "",
+        "## Modules summary",
+        modules_summary[:3000],
+        "",
+        personas_block,
+        "",
+        research_section,
+    ])
+
+
 def render_prompts_block(
     inventory: list[dict],
     annotations: dict[str, dict],

@@ -120,3 +120,89 @@ def test_scan_report_git_last_touch_keyed_by_path(tmp_path):
     assert "git_last_touch" in report
     # main.py was committed → must have a date.
     assert report["git_last_touch"].get("main.py") == "2026-05-15"
+
+
+def test_build_features_prompt_requires_10_block_keys():
+    """Prompt instructs LLM to return strict JSON with all 10 block keys."""
+    from scripts.architect.sections import build_features_prompt
+
+    prompt = build_features_prompt(
+        project="P",
+        readme_sections={"Features": "Auth, KB"},
+        agents_md_text="Routing table here.",
+        changelog={"unreleased": []},
+        api_surface_summary="3 HTTP routes, 0 CLI",
+        modules_summary="backend, frontend",
+        personas_summary="(no personas yet)",
+        research_excerpts=[],
+        output_lang="zh-TW",
+    )
+    for key in (
+        "summary",
+        "capability-inventory",
+        "product-coverage",
+        "limitations",
+        "strengths",
+        "weaknesses",
+        "missing-features",
+        "improvements",
+        "doc-sync-actions",
+        "dependencies",
+    ):
+        assert key in prompt, f"prompt must mention block key {key!r}"
+
+
+def test_build_features_prompt_capability_inventory_is_structured_list():
+    """capability-inventory must be requested as STRUCTURED LIST not markdown table."""
+    from scripts.architect.sections import build_features_prompt
+
+    prompt = build_features_prompt(
+        project="P",
+        readme_sections={}, agents_md_text="", changelog={},
+        api_surface_summary="", modules_summary="", personas_summary="",
+        research_excerpts=[], output_lang="zh-TW",
+    )
+    assert "structured list" in prompt.lower() or "list of dict" in prompt.lower(), (
+        "prompt should ask LLM to return capability-inventory as structured list"
+    )
+    assert "code_anchors" in prompt
+    assert "doc_anchors" in prompt
+
+
+def test_build_features_prompt_research_excerpts_listed_when_present():
+    """When research_excerpts non-empty, prompt body lists title + first_para."""
+    from scripts.architect.sections import build_features_prompt
+
+    prompt = build_features_prompt(
+        project="P",
+        readme_sections={}, agents_md_text="", changelog={},
+        api_surface_summary="", modules_summary="", personas_summary="",
+        research_excerpts=[
+            {"path": "Research/x.md", "title": "X trend",
+             "first_para": "X paragraph", "tags": [], "date": "2026-04-01"}
+        ],
+        output_lang="zh-TW",
+    )
+    assert "X trend" in prompt
+    assert "X paragraph" in prompt
+
+
+def test_build_features_prompt_personas_directive_only_when_provided():
+    """product-coverage block directive references personas only when summary non-empty."""
+    from scripts.architect.sections import build_features_prompt
+
+    no_p = build_features_prompt(
+        project="P",
+        readme_sections={}, agents_md_text="", changelog={},
+        api_surface_summary="", modules_summary="", personas_summary="",
+        research_excerpts=[], output_lang="zh-TW",
+    )
+    with_p = build_features_prompt(
+        project="P",
+        readme_sections={}, agents_md_text="", changelog={},
+        api_surface_summary="", modules_summary="",
+        personas_summary="Persona Mary: shift handoff job",
+        research_excerpts=[], output_lang="zh-TW",
+    )
+    assert "Persona Mary" in with_p
+    assert "Persona Mary" not in no_p
