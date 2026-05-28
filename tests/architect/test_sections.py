@@ -728,3 +728,29 @@ def test_compose_overview_v4_drill_down_links_to_keep_files():
     for obsolete in ("api-surface", "features", "future", "roadmap", "jobs", "flows"):
         assert f"[[{obsolete}]]" not in drill_section, \
             f"drill-down should not reference deleted v3 file {obsolete!r}"
+
+
+def test_build_overview_prompt_v4_demands_report_blocks():
+    from scripts.architect.sections import build_overview_prompt
+    prompt = build_overview_prompt(
+        project="myproj",
+        modules_summary="backend, frontend, services",
+        agents_md_excerpt="Tech Stack: FastAPI, React.",
+        readme_excerpt="LINE OA admin tool.",
+        personas_summary="Admin, Agent, End-user",
+        per_module_improvements_summary="See modules/*.md improvements",
+        output_lang="zh-TW",
+    )
+    # Demands the 5 LLM block names
+    assert "purpose" in prompt
+    assert "system-diagram" in prompt or "system_diagram" in prompt
+    assert "capabilities" in prompt
+    assert "flows" in prompt
+    assert "cross-cutting-improvements" in prompt or "cross_cutting" in prompt
+    # Demands Mermaid in system-diagram
+    assert "mermaid" in prompt.lower()
+    # zh-TW directive
+    assert "繁體中文" in prompt or "zh-TW" in prompt
+    # Cross-cutting Imps must follow strict 5-field format
+    for field in ("Why", "Evidence", "Effort", "Risk", "Confidence"):
+        assert field in prompt

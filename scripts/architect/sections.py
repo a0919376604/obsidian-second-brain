@@ -634,6 +634,133 @@ def compose_overview(
     return "\n".join(fm + body) + "\n"
 
 
+def build_overview_prompt(
+    *,
+    project: str,
+    modules_summary: str,
+    agents_md_excerpt: str,
+    readme_excerpt: str,
+    personas_summary: str,
+    per_module_improvements_summary: str,
+    output_lang: str,
+) -> str:
+    """v4 — top-down report overview synthesis prompt.
+
+    The LLM produces 5 blocks; `compose_overview` then assembles with
+    deterministic Stack / Module map / Drill-down sections.
+    """
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫所有 prose。Code identifier (檔名、function、"
+            "endpoint path、env var、wikilink 內檔名段) 保持英文。"
+        )
+    else:
+        lang_directive = (
+            "Write all prose in English. Code identifiers stay English."
+        )
+
+    return "\n".join([
+        f"You are writing the v4 top-down architecture *report* for project `{project}`.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. This is a REPORT, not an MOC. The reader opens overview.md and gets the "
+        "   whole story; they should NOT need to drill into other files just to "
+        "   understand what this project is and what's important about it.",
+        "2. The Stack / Module map / Drill-down sections are rendered deterministically "
+        "   by the caller — DO NOT produce them. Focus on the 5 LLM blocks below.",
+        "3. Cross-cutting improvements MUST be cross-module. Single-module problems "
+        "   stay in their module note. Each cross-cutting Imp should cite ≥ 2 modules "
+        "   in its Evidence.",
+        "",
+        "## Output: produce 5 @generated blocks (JSON keys)",
+        "",
+        "### `purpose`",
+        "1 short paragraph + a 3-5 bullet 'For whom' list of primary personas.",
+        "  Example shape (zh-TW):",
+        "  ```",
+        "  - **是什麼:** 一句話定義",
+        "  - **服務對象 (主要 personas):**",
+        "    - <persona 1> — <one-line role>",
+        "    - <persona 2> — <one-line role>",
+        "  - **核心承諾:** 1-2 句",
+        "  ```",
+        "",
+        "### `system-diagram`",
+        "ONE Mermaid `graph TD` block showing the project at top-down level:",
+        "external systems → frontend/backend → internal modules → data layer.",
+        "Format:",
+        "  ```mermaid",
+        "  graph TD",
+        "      External --> ...",
+        "  ```",
+        "Keep ≤ 12 nodes. This is the bird's-eye view; specific flows live in §Flows.",
+        "",
+        "### `capabilities`",
+        "What this codebase DOES, grouped by capability area as H3 sub-sections, "
+        "each with 1-3 short bullets. Format:",
+        "  ```",
+        "  ### Authentication",
+        "  - <capability>, links to [[modules/<slug>]]",
+        "  ",
+        "  ### Webhook ingest",
+        "  - <capability>",
+        "  ```",
+        "Aim for 5-8 capability areas. NO file paths in body prose — wikilinks only.",
+        "",
+        "### `flows`",
+        "3-5 key user-level flows. Each flow is an H3 + Mermaid sequence + 2-4 "
+        "friction bullets. Format:",
+        "  ```",
+        "  ### Flow 1: <name in zh-TW or en>",
+        "  ```mermaid",
+        "  sequenceDiagram",
+        "      participant U as User",
+        "      U->>S: ...",
+        "  ```",
+        "  **摩擦 / Friction:**",
+        "  - <concrete pain> → 詳見 [[modules/<slug>#改進機會]]",
+        "  - ...",
+        "  ```",
+        "Pick the most user-visible / business-critical flows. Skip internal-only data flows.",
+        "",
+        "### `cross-cutting-improvements`",
+        "Top 3-5 improvement opportunities that span multiple modules. Each MUST:",
+        "  - Be a cross-cutting concern (e.g. 'extract worker convention' impacts "
+        "    backend + modules; 'TS migration' impacts frontend × N pages).",
+        "  - Cite ≥ 2 modules in Evidence (wikilinks to module Imps).",
+        "  - Follow the strict 5-field format:",
+        "    ```",
+        "    ### Imp <n>: <verb-first title ≤ 30 chars>",
+        "    - **為什麼 / Why:** <≤ 1 sentence>",
+        "    - **證據 / Evidence:** [[modules/<slug>#改進機會]] Imp N | [[modules/<other>...]] Imp M",
+        "    - **Effort:** S | M | L | XL",
+        "    - **未做的風險 / Risk if not done:** <≤ 1 sentence>",
+        "    - **Confidence:** stated | high | medium | speculation",
+        "    ```",
+        "  - If you cannot identify cross-module evidence, DO NOT invent the Imp.",
+        "",
+        "Return strict JSON: {\"purpose\": \"...\", \"system-diagram\": \"...\", "
+        "\"capabilities\": \"...\", \"flows\": \"...\", \"cross-cutting-improvements\": \"...\"}.",
+        "",
+        "## Project context",
+        f"### Modules detected: {modules_summary}",
+        "",
+        "### Personas summary",
+        personas_summary[:2000],
+        "",
+        "### Per-module improvement opportunities (cite these in cross-cutting evidence)",
+        per_module_improvements_summary[:4000],
+        "",
+        "### README excerpt",
+        readme_excerpt[:4000],
+        "",
+        "### AGENTS.md excerpt",
+        agents_md_excerpt[:4000],
+    ])
+
+
 def build_module_prompt(
     *,
     module_slug: str,
