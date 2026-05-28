@@ -105,3 +105,38 @@ def test_source_hash_changes_when_body_changes(tmp_path: Path):
     (tmp_path / "config" / "prompts.toml").write_text('[p]\ntemplate = "v2"\n')
     h2 = extract_prompts(tmp_path)[0].source_hash
     assert h1 != h2
+
+
+def test_dynamic_prompt_concat_detected(tmp_path: Path):
+    """A prompt assembled via string concat across multiple sources should be marked dynamic."""
+    (tmp_path / "agent.py").write_text(
+        '\n'
+        '_BASE = "You are an assistant."\n'
+        '_TONE = "Be concise."\n'
+        '\n'
+        'def make_prompt(user_input: str) -> str:\n'
+        '    return _BASE + " " + _TONE + " Question: " + user_input\n'
+        '\n'
+        '# Note: no SYSTEM_PROMPT module constant exists.\n'
+    )
+    prompts = extract_prompts(tmp_path)
+    # Two constants are short individually (don't look like prompts on their own).
+    # The concat function isn't a static prompt — should NOT extract a stitched-together fake.
+    # Either: nothing is extracted, OR if anything is extracted it's marked is_dynamic=True.
+    for p in prompts:
+        if "Question" in p.body and "assistant" in p.body:
+            # If something looking like the concat IS produced, it MUST be marked dynamic.
+            assert p.is_dynamic is True, "stitched-together prompt must be marked dynamic"
+
+
+def test_dynamic_marker_for_format_string_calls(tmp_path: Path):
+    """If a make_prompt() / build_prompt() function is detected with multiple inputs, mark dynamic."""
+    (tmp_path / "agent.py").write_text(
+        '\n'
+        'def build_system_prompt(persona: str, tools: list[str]) -> str:\n'
+        '    return f"You are {persona}. Available tools: {tools}. Be helpful."\n'
+    )
+    # No module-level constant; function with dynamic params doesn't produce a static extract.
+    # This is a "skip cleanly" case — extract_prompts returns empty.
+    prompts = extract_prompts(tmp_path)
+    assert prompts == [] or all(p.is_dynamic for p in prompts)

@@ -9,6 +9,13 @@ Extractors run in priority order:
 2. Python module-level UPPER_CASE constants assigned triple-quoted strings
 3. SYSTEM_PROMPT / USER_PROMPT / TEMPLATE_ prefixed constants
 4. LangChain ChatPromptTemplate.from_messages([...]) message contents
+
+Dynamic prompts (assembled at runtime via string concat / multi-source build):
+We deliberately do NOT trace them and synthesize a "stitched" body — that would
+be misleading because the actual runtime content depends on inputs. Instead,
+the ai-flow LLM prompt (in sections.py `build_ai_flow_prompt`) is instructed
+to look at the source files directly and write a description block, flagging
+`Type: dynamic` in the rendered Prompts section.
 """
 
 from __future__ import annotations
