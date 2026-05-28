@@ -1025,6 +1025,26 @@ def _slugify_prompt(name: str) -> str:
     return s or "unknown"
 
 
+def format_ai_engine_link(
+    *,
+    flow_slug: str,
+    framework: str,
+    flow_kind: str,
+    lang: str = "en",
+) -> str:
+    """Render a sentinel-wrapped 1-line `**AI engine:** [[ai-flows/<slug>]]` row.
+
+    Inserted into the host module's note so the reader sees the module hosts
+    an AI subsystem with one click to the deep judgment file.
+    """
+    label = "**AI engine:**"
+    return "\n".join([
+        "<!-- @generated:start ai-engine-link -->",
+        f"{label} [[ai-flows/{flow_slug}]] ({framework}; {flow_kind})",
+        "<!-- @generated:end ai-engine-link -->",
+    ])
+
+
 def build_module_prompt(
     *,
     module_slug: str,

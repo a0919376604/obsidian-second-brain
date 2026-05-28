@@ -932,3 +932,31 @@ def test_render_prompts_block_empty_inventory():
     from scripts.architect.sections import render_prompts_block
     rendered = render_prompts_block([], {}, lang="zh-TW")
     assert "(no static prompts extracted)" in rendered or "未偵測到 prompts" in rendered
+
+
+def test_format_ai_engine_link_for_module():
+    from scripts.architect.sections import format_ai_engine_link
+    line = format_ai_engine_link(
+        flow_slug="lang-ai-customer",
+        framework="langgraph",
+        flow_kind="real-time-chat",
+        lang="zh-TW",
+    )
+    # Sentinel-wrapped, 1-line wikilink
+    assert "<!-- @generated:start ai-engine-link -->" in line
+    assert "<!-- @generated:end ai-engine-link -->" in line
+    assert "[[ai-flows/lang-ai-customer]]" in line
+    assert "langgraph" in line.lower()
+    assert "real-time-chat" in line.lower()
+    # User-facing label
+    assert "**AI engine:**" in line
+
+
+def test_format_ai_engine_link_en():
+    from scripts.architect.sections import format_ai_engine_link
+    line = format_ai_engine_link(
+        flow_slug="qa-to-kb", framework="custom-pipeline",
+        flow_kind="batch-pipeline", lang="en",
+    )
+    assert "[[ai-flows/qa-to-kb]]" in line
+    assert "custom-pipeline" in line.lower()
