@@ -534,6 +534,12 @@ Steps:
   AI flow with full prompts (collapsible callout), graph topology, state
   schema, LLM config, eval gaps, and design judgment. Feeds
   `/obsidian-roadmap` Phase 1 via cross-cutting + module + AI flow Imps.
+- **v4.2 (2026-05-28):** Re-introduces `features.md` as a **product PM lens** —
+  capability inventory with deterministic online/deprecated status (from git +
+  api_surface), product gap analysis grounded in vault `Research/` excerpts,
+  PM-voice strengths/weaknesses/limitations, doc-sync action todos. Frontmatter
+  carries `feature-count` / `deprecated-count` / `doc-sync-score` for cross-
+  project DataView aggregation. Flags `--no-features` / `--features-only`.
 
 ---
 

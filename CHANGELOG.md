@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `/obsidian-architect` v4.2 — `features.md` as product PM lens. Per spec
+  `docs/superpowers/specs/2026-05-28-obsidian-architect-v4.2-features-design.md`.
+  Adds `research_walker.py`, `git_history.py`, `build_features_prompt`,
+  `render_features_inventory` (deterministic online/deprecated marker),
+  `compute_doc_sync_score`, `parse_doc_actions_block`. `/obsidian-roadmap`
+  candidate detector walks features.md missing-features / improvements /
+  doc-sync-actions blocks with dedup against module Imps via Evidence
+  wikilink overlap.
 - `/obsidian-architect` v4.1 — AI Flows layer. Scanner auto-detects LangGraph,
   LangChain, and custom-pipeline AI subsystems (threshold: ≥ 3 nodes) and
   produces `Architecture/ai-flows/<slug>.md` per flow. Each note has 10 body
