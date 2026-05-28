@@ -284,3 +284,26 @@ def test_ai_flow_prompt_drift_helper():
     assert ai_flow_prompt_changed(lock, "lang-ai-customer", "new_prompt", "sha256:anything") is True
     # Missing flow → changed
     assert ai_flow_prompt_changed(lock, "nonexistent-flow", "intent_classifier", "sha256:x") is True
+
+
+def test_lockfile_sections_features_slot_round_trip(tmp_path):
+    """sections.features round-trips through Lockfile.save → load with v4.2 fields."""
+    from scripts.architect.lockfile import Lockfile
+
+    lock = Lockfile(version=4, scanner_version="0.2.0", frame="report-v4")
+    lock.sections["features"] = {
+        "signal-hash": "sha256:abc123",
+        "lang": "zh-TW",
+        "last-generated": "2026-05-29",
+        "commit": "deadbeef",
+        "feature-count": 32,
+        "deprecated-count": 3,
+        "doc-sync-score": 0.87,
+    }
+    p = tmp_path / "_manifest.lock.json"
+    lock.save(p)
+
+    loaded = Lockfile.load(p)
+    assert loaded.sections["features"]["feature-count"] == 32
+    assert loaded.sections["features"]["doc-sync-score"] == 0.87
+    assert loaded.sections["features"]["signal-hash"] == "sha256:abc123"

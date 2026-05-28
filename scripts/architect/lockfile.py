@@ -36,6 +36,13 @@ class Lockfile:
         default_factory=dict
     )  # v4.1 — per-flow + per-prompt source-hash tracking
 
+    def save(self, path: Path) -> None:
+        write_lockfile(self, path)
+
+    @classmethod
+    def load(cls, path: Path) -> "Lockfile | None":
+        return load_lockfile(path)
+
 
 def hash_value(s: str) -> str:
     """Return 'sha256:<hex>' for stable comparison."""
