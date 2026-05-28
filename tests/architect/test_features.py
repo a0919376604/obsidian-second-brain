@@ -338,3 +338,33 @@ def test_compose_features_note_emits_extra_frontmatter():
     assert "feature-count: 1" in fm_section
     assert "ai-first: true" in fm_section
     assert fm_section.index("feature-count") < fm_section.index("ai-first")
+
+
+def test_parse_doc_actions_block_extracts_checkbox_lines():
+    from scripts.architect.sections import parse_doc_actions_block
+
+    body = (
+        "### 清除 deprecated 殘留\n"
+        "- [ ] Remove `/old-endpoint` mention from README.md L42-48\n"
+        "- [ ] Remove deprecated CLI `archive-tickets` from AGENTS.md\n"
+        "\n"
+        "### 補缺 doc\n"
+        "- [ ] Add `Knowledge Base` README section listing /kb-candidates/*\n"
+    )
+    actions = parse_doc_actions_block(body)
+    assert len(actions) == 3
+    assert actions[0]["group"] == "清除 deprecated 殘留"
+    assert "Remove `/old-endpoint`" in actions[0]["text"]
+    assert actions[2]["group"] == "補缺 doc"
+
+
+def test_parse_doc_actions_block_ignores_non_checkbox_bullets():
+    from scripts.architect.sections import parse_doc_actions_block
+
+    body = (
+        "### 清除\n"
+        "- regular bullet, ignored\n"
+        "- [ ] checkbox line, kept\n"
+    )
+    actions = parse_doc_actions_block(body)
+    assert len(actions) == 1

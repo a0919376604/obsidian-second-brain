@@ -1248,6 +1248,27 @@ def compose_features_note(
     return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
 
 
+def parse_doc_actions_block(body: str) -> list[dict]:
+    """Parse the `doc-sync-actions` block into action dicts.
+
+    Returns list of {group: str, text: str} where group is the H3 heading
+    (without `### `) and text is the checkbox-line content after `- [ ] `.
+    Non-checkbox bullets are ignored.
+    """
+    actions: list[dict] = []
+    current_group = ""
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("### "):
+            current_group = stripped[4:].strip()
+            continue
+        if stripped.startswith("- [ ] ") or stripped.startswith("- [x] "):
+            text = stripped[6:].strip()
+            if text:
+                actions.append({"group": current_group, "text": text})
+    return actions
+
+
 def render_prompts_block(
     inventory: list[dict],
     annotations: dict[str, dict],
