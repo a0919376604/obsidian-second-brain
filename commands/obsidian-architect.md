@@ -13,12 +13,17 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
 `--functions=<off|public>`, `--skip-sections=<csv>`, `--only-sections=<csv>`,
 `--lang=<en|zh-TW>` (override vault `_CLAUDE.md output-lang`).
 
-**v3-specific flags:**
-- `--frame=<judgment|description>` — default `judgment` (v3). Use `description`
-  to fall back to v2 behaviour for compatibility.
-- `--improvements-per-file=<N>` — cap on Imps per architect file. Default 4.
+**v4-specific flags:**
+- `--frame=<report|judgment|description>` — default `report` (v4). `judgment`
+  falls back to v3 behaviour; `description` to v2. v4 produces 8 files
+  (overview + 5 modules + decisions + personas); legacy frames keep their
+  larger file counts.
+- `--keep-deprecated` — when migrating v3→v4, do NOT delete the 6 obsolete
+  files. Not recommended; tar.gz backup already preserves them.
+- `--improvements-per-file=<N>` — cap on per-file Imps, default 4. Overview
+  cross-cutting Imps cap separately at 5.
 - `--require-evidence` — default true. When false, LLM may emit Imps without
-  Evidence (debugging only; not recommended).
+  Evidence (debugging only).
 
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
@@ -75,6 +80,28 @@ Detect if `Projects/<P>/Architecture/_manifest.lock.json` exists and reports
 After successful migration, lockfile is overwritten in Phase 5 (per-section
 synthesis) with `schema-version: 3` and `frame: "judgment-v3"`.
 
+## Phase 1.6: v3 → v4 migration (only when `--frame=report` AND existing vault is v3)
+
+Detect if `Projects/<P>/Architecture/_manifest.lock.json` exists and reports
+`frame: "judgment-v3"` (or `version: 3`).
+
+1. Call `scripts.architect.migration.plan_v3_to_v4_migration(arch_dir)`.
+2. Print the plan to the user — 6 files to delete (`future.md`, `roadmap.md`,
+   `jobs.md`, `api-surface.md`, `features.md`, `flows.md`), known-limitations
+   content to migrate into `decisions.md`, files kept (`overview.md`,
+   `modules/*`, `decisions.md`, `personas.md`).
+3. ASK user `proceed | dry-run | abort`. `--force` bypasses with proceed.
+   `--keep-deprecated` skips the delete step but still merges known-limitations.
+4. On `proceed`: call `backup_architecture_dir(arch_dir)` first
+   (tar.gz to `_archive/architecture-pre-v4-<timestamp>.tar.gz`), then
+   `apply_v3_to_v4_migration(arch_dir, plan, dry_run=False)`.
+5. On `dry-run`: call `apply_v3_to_v4_migration(... dry_run=True)` and stop.
+
+After successful migration the overview.md content from v3 is now stale (it's
+still the v3 MOC). Phase 4 (Overview synthesis below) overwrites it with v4
+report content. Lockfile is rewritten in Phase 5 with `version: 4`,
+`frame: "report-v4"`.
+
 ## Phase 2: Manifest review
 
 Read `_manifest.yml` from the temp output. If
@@ -125,7 +152,7 @@ The new module note:
 - Body is judgment, not transcription.
 - Dependencies section uses wikilinks only.
 
-## Phase 3.5: Per-section synthesis
+## Phase 3.5: Per-section synthesis (v4)
 
 Resolve `output_lang`:
 
@@ -133,55 +160,20 @@ Resolve `output_lang`:
 uv run python -c "from scripts.architect.lang import resolve_output_lang; from pathlib import Path; import sys; print(resolve_output_lang(sys.argv[1] or None, Path(sys.argv[2])))" "${LANG_FLAG:-}" "<vault-root>"
 ```
 
-For each section in order (`api-surface`, `features`, `decisions`, `roadmap`,
-`future`), and for each non-skipped section per `--skip-sections` /
-`--only-sections`:
+Order:
+1. **decisions.md** — `compose_note(section="decisions", ...)`. New block
+   `known-limitations` is populated from migration carry-over (if any) plus
+   LLM additions; the LLM should produce the other blocks (summary,
+   stack-rationale, etc.) per existing v3 behavior.
+2. **personas.md** — `compose_note(section="personas", ...)`. Lighter v4
+   version: drop the heavy pain-points list (those moved to module Imps).
 
-1. Call `scripts.architect.sections.collect_signals(section, scan_report, manifest_modules)` to get the signal subset.
-2. Compute `signal_hash(signal)` and call `scripts.architect.refresh.decide_section_refresh(lock, section=..., current_signal=hash, current_lang=output_lang, force=force, refresh_flag=refresh)`. If SKIP, continue.
-3. For api-surface, use the deterministic table renderers from `scripts.architect.api_surface_render` — no LLM call for the table contents; LLM only writes the `summary` block.
+Removed in v4 (no longer written): api-surface.md, features.md, roadmap.md,
+future.md, jobs.md, flows.md. If `--frame=judgment` is passed, the v3
+behavior is restored and these are written.
 
-### Phase 3.5.5: personas / jobs / flows synthesis (v3)
-
-After api-surface, BEFORE features (because features cross-references jobs/flows).
-
-For each new product-eye file:
-
-**Personas:**
-```python
-from scripts.architect.personas import collect_persona_signal, build_personas_prompt, render_personas_section, Persona
-sig = collect_persona_signal(repo_root)
-if sig.has_explicit_section:
-    confidence_default = "stated"
-    readme_excerpt = sig.raw_text
-else:
-    confidence_default = "medium"
-    readme_excerpt = "(no explicit personas section)"
-prompt = build_personas_prompt(
-    project=project_name,
-    readme_excerpt=readme_excerpt,
-    agents_md_excerpt=agents_md_text[:5000],
-    features_summary=features_summary_text,
-    output_lang=output_lang,
-)
-# Agent invokes LLM, parses JSON into list[Persona], then:
-note_body = render_personas_section(personas, lang=output_lang)
-# Wrap in `## 使用者型態` heading + frontmatter + sentinel; write to personas.md.
-```
-
-**Jobs** — similar pattern using `scripts.architect.jobs` (depends on personas being written first so the prompt can cite them).
-
-**Flows** — similar pattern using `scripts.architect.flows` (depends on personas + api-surface summary).
-
-When `has_explicit_section is False`, prepend an Obsidian callout to the file body:
-```markdown
-> [!warning]+ 本檔大半為 LLM 推論,owner 校對前不可作為正式產品 spec
-```
-
-4. For features / decisions / roadmap / future, build the LLM prompt with `sections.build_prompt(...)`, run it, parse the JSON response into a `{block-name: body}` dict.
-5. Call `sections.compose_note(section=..., generated_blocks=..., output_lang=..., ...)` to assemble the markdown.
-6. Write to `Projects/<P>/Architecture/<filename>`.
-7. Update the lockfile `sections[<name>]` entry with the new `signal-hash`, `lang`, `note-blocks-hash`, and `last-generated` timestamp.
+api-surface detection still runs as part of Phase 1 deterministic scan; the
+data lives in `scan-report.json` for `/obsidian-roadmap` and other tooling.
 
 For per-section content rules see `references/ai-first-rules.md` §language and §architecture-*.
 
@@ -194,43 +186,47 @@ If `--functions=public`:
 
 Failure isolation: if any one section or function synthesis throws, write the note with `status: scan-failed`, record the error in the body, and continue.
 
-## Phase 4: Overview synthesis (v3 frame)
+## Phase 4: Overview synthesis (v4 top-down report)
 
-In addition to the v2 MOC structure (Stack frontmatter, Capability MOC,
-Structure MOC), the overview now emits its own `## 改進機會` block —
-4-6 project-level improvement opportunities that span modules (e.g.
-"split EventConsumer from API process for independent scaling"). Each
-Imp follows the same Why/Evidence/Effort/Risk/Confidence schema.
+This is the centerpiece of v4. The overview becomes a self-contained report.
 
-Build prompt via `sections.build_overview_prompt(...)` (existing helper —
-prompt instructs LLM to produce purpose / layer-map / external-deps /
-key-abstractions / **improvements** blocks).
+1. Gather context inputs:
+   - `modules_summary` — slug + display name + 1-line role per module
+     (from manifest + module note `## 模組職責` blocks).
+   - `personas_summary` — first 2 KB of `personas.md`.
+   - `per_module_improvements_summary` — concatenation of each module's
+     `## 改進機會` block (capped). The LLM uses this to write cross-cutting
+     Imps with proper Evidence wikilinks.
+   - `readme_excerpt`, `agents_md_excerpt` — first 4 KB of each.
 
-Add `improvements` to the overview's `_BLOCK_NAMES` if not already present.
+2. Build the prompt: `scripts.architect.sections.build_overview_prompt(...)`.
 
-Read every section note's `## Summary` block, plus stack, modules, and entry
-points from the scan-report.
+3. Invoke the LLM. Expect strict JSON:
+   ```json
+   {
+     "purpose": "...",
+     "system-diagram": "```mermaid\\n...\\n```",
+     "capabilities": "### Area\\n- ...",
+     "flows": "### Flow 1: ...\\n```mermaid\\n...\\n```\\n**摩擦:**\\n- ...",
+     "cross-cutting-improvements": "### Imp 1: ...\\n- **為什麼:** ..."
+   }
+   ```
 
-Run an LLM call to produce only the @generated blocks (`purpose`, `layer-map`,
-`external-deps`, `key-abstractions`). The bilingual headings, Capability MOC,
-Structure MOC, and stack body are rendered deterministically by
-`sections.compose_overview()`.
+4. Validate `cross-cutting-improvements` via `parse_improvements_block(...)`.
+   Each Imp must cite ≥ 2 modules in its Evidence (cross-cutting requirement).
+   If a candidate Imp cites only one module, downgrade it / drop it. Aim for
+   3-5 Imps total.
 
-Write the result to `Projects/<P>/Architecture/overview.md`. The frontmatter
-includes `moc-style: true`, the detected `stack:` block (omitted if empty),
-and `lang: <output_lang>`.
+5. Compose: `scripts.architect.sections.compose_overview(...)` assembles the
+   8-section report. Stack section is auto-generated from `stack` arg
+   (which was detected by Phase 1 scanner). Module map and Drill-down
+   sections are deterministic from `modules` arg.
 
-`overview.md` body section order (matching `compose_overview`):
-1. `## For future Claude` / `## 給未來 Claude`
-2. `## Purpose` / `## 用途` (LLM block)
-3. `## Stack` / `## 技術棧` (deterministic, mirrors frontmatter)
-4. `## Capability MOC` / `## 能力地圖 MOC` (wikilinks to all 4 narrative sections)
-5. `## API surface` / `## API 介面` (wikilink to api-surface.md)
-6. `## Structure MOC` / `## 結構地圖 MOC` (module wikilinks + entry points)
-7. `## Layer map` / `## 分層圖` (LLM Mermaid block)
-8. `## External dependencies` / `## 外部相依` (LLM block)
-9. `## Key abstractions` / `## 核心抽象` (LLM block)
-10. `## Related` / `## 相關`
+6. Write to `Projects/<P>/Architecture/overview.md`. The frontmatter has
+   `report-style: true` and `lang: <output_lang>`.
+
+7. Update lockfile section entry: `sections.overview.signal-hash`,
+   `sections.overview.lang`, etc.
 
 ## Data flow note (optional)
 
@@ -240,18 +236,25 @@ multiple modules), generate `Projects/<P>/Architecture/data-flow.md`
 with a Mermaid sequence diagram plus brief walkthrough. Skip if no such
 chain is detectable - never write speculative data-flow diagrams.
 
-## Hub note update
+## Hub note update (v4)
 
-Generate the `## Architecture` block via
-`scripts.architect.refresh.render_hub_architecture_block(...)`, passing
-`lang=output_lang`. Append or replace in `Projects/<P>/<P>.md`.
+Append/replace `## Architecture` (or `## 架構` if zh-TW) block in
+`Projects/<P>/<P>.md`. v4 wikilinks:
 
-In `en` mode, the heading is `## Architecture`; in `zh-TW`, `## 架構`.
-Idempotent: section exists -> replace in place; otherwise append.
+```markdown
+## 架構
 
-Note: other commands (`/obsidian-project`, `/obsidian-board`) may still
-write English headings into the same hub. Mixed-language is tolerated
-during the cross-command rollout.
+- 總覽 (top-down 報告): [[Architecture/overview]] (v4 report-style, 上次掃描 YYYY-MM-DD @ `<sha>`)
+- 模組設計判斷: [[Architecture/modules/backend]] | [[Architecture/modules/frontend]] | ... (list each module)
+- 技術決定 + ADR 候選 + 已知限制: [[Architecture/decisions]]
+- 使用者型態 reference: [[Architecture/personas]]
+- Curated Roadmap: [[Roadmap]]
+- 重新整理: `/obsidian-architect <repo-path> --refresh`
+```
+
+The legacy v3 wikilinks to `future.md` / `roadmap.md` / `jobs.md` /
+`api-surface.md` / `features.md` / `flows.md` MUST be removed from the
+hub block — those vault files no longer exist post-migration.
 
 ## Daily and operation log
 
