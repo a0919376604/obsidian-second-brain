@@ -1,8 +1,4 @@
-"""Phase 1 — gap candidate detection from Architecture/ files.
-
-Reads future.md / decisions.md / roadmap.md, extracts bullets from known
-sections, normalizes + deduplicates, returns ordered Candidate list.
-"""
+"""Phase 1 — gap candidate detection from Architecture/ files."""
 
 from __future__ import annotations
 
@@ -53,27 +49,46 @@ _NUMBERED_RE = re.compile(r"^\d+\.\s+(.+)$", re.MULTILINE)
 
 
 def detect_candidates(project_root: Path) -> list[Candidate]:
-    """Walk Architecture/ subfiles, extract candidates, dedup, return.
+    """Walk Architecture/ files, extract candidates.
 
-    v3: prefers `## 改進機會` / `## Improvement opportunities` blocks from any
-    architect file (overview.md, features.md, modules/*.md, flows.md, jobs.md).
-    Each Imp becomes a fully-structured Candidate. v2 sections (future.md
-    落差分析 / 期望中的想法 / decisions.md Promote-to-ADR) are still consulted
-    as supplementary signal.
+    v4: only reads overview.md, modules/*.md, and decisions.md `## 改進機會`
+    or `## Improvement opportunities` blocks. Legacy v3 files (future.md,
+    roadmap.md, jobs.md, api-surface.md, features.md, flows.md) are NOT walked
+    even if they exist — those go through v3->v4 migration first.
+
+    Also extracts `## 已知限制` from decisions.md as kind=limitation candidates.
     """
     arch = project_root / "Architecture"
     if not arch.is_dir():
         return []
     out: list[Candidate] = []
-    # v3 improvements — walk every architect file.
-    files = list(arch.glob("*.md")) + list((arch / "modules").glob("*.md"))
-    for f in files:
+
+    # v4 signal sources — only overview + modules/*.md + decisions.md.
+    candidate_files = []
+    if (arch / "overview.md").is_file():
+        candidate_files.append(arch / "overview.md")
+    if (arch / "decisions.md").is_file():
+        candidate_files.append(arch / "decisions.md")
+    if (arch / "modules").is_dir():
+        candidate_files.extend(sorted((arch / "modules").glob("*.md")))
+
+    for f in candidate_files:
         out.extend(_extract_improvements_from_file(f, arch))
-    # v2 legacy signals.
-    out.extend(_extract_from_file(arch / "future.md", _FUTURE_SECTIONS))
-    out.extend(_extract_from_file(arch / "decisions.md", _DECISIONS_SECTIONS))
-    out.extend(_extract_from_file(arch / "roadmap.md", _ROADMAP_SECTIONS, freq_dedup=True))
+
+    # Decisions.md gets two extra extraction paths beyond `## 改進機會`:
+    # 1. `## 建議升級為 ADR` (promote-to-ADR list) — kept from v3
+    # 2. `## 已知限制` (known limitations, post-v4 migration) — new in v4
+    if (arch / "decisions.md").is_file():
+        out.extend(_extract_from_file(arch / "decisions.md", _DECISIONS_SECTIONS))
+        out.extend(_extract_known_limitations(arch / "decisions.md", arch))
+
     return _dedup(out)
+
+
+_KNOWN_LIM_SECTIONS = {
+    "## 已知限制": "limitation",
+    "## Known limitations": "limitation",
+}
 
 
 def _extract_improvements_from_file(path: Path, arch_root: Path) -> list[Candidate]:
@@ -86,7 +101,7 @@ def _extract_improvements_from_file(path: Path, arch_root: Path) -> list[Candida
         return []
     # Locate the H2 block body.
     pattern = re.compile(
-        r"^##\s+(?:改進機會|Improvement opportunities)\s*$([\s\S]*?)(?=^##\s|\Z)",
+        r"^##\s+(?:改進機會|Improvement opportunities|跨模組改進機會|Cross-cutting improvements)\s*$([\s\S]*?)(?=^##\s|\Z)",
         re.MULTILINE,
     )
     m = pattern.search(text)
@@ -99,7 +114,12 @@ def _extract_improvements_from_file(path: Path, arch_root: Path) -> list[Candida
     imps = parse_improvements_block(body)
     out: list[Candidate] = []
     arch_rel = rel_path.replace(".md", "")
-    anchor = "改進機會" if "改進機會" in text else "Improvement opportunities"
+    if "跨模組改進機會" in text:
+        anchor = "跨模組改進機會"
+    elif "Cross-cutting improvements" in text:
+        anchor = "Cross-cutting improvements"
+    else:
+        anchor = "改進機會" if "改進機會" in text else "Improvement opportunities"
     for imp in imps:
         cand_id = _make_id("imp", _normalize_title(imp.title))
         out.append(Candidate(
@@ -115,6 +135,36 @@ def _extract_improvements_from_file(path: Path, arch_root: Path) -> list[Candida
             risk_if_not_done=imp.risk_if_not_done,
             confidence=imp.confidence,
         ))
+    return out
+
+
+def _extract_known_limitations(path: Path, arch_root: Path) -> list[Candidate]:
+    """Extract known-limitations bullets from decisions.md as `limitation` candidates."""
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return []
+    out: list[Candidate] = []
+    for heading_str, kind in _KNOWN_LIM_SECTIONS.items():
+        body, body_line = _section_body(text, heading_str)
+        if body is None:
+            continue
+        anchor = heading_str.lstrip("# ").strip()
+        bullets = _BULLET_RE.findall(body)
+        rel = path.relative_to(arch_root.parent).as_posix().replace(".md", "")
+        for raw in bullets:
+            title = _normalize_title(raw)
+            cand_id = _make_id(kind, title)
+            out.append(Candidate(
+                id=cand_id,
+                title=title or raw,
+                source_wikilink=f"[[{rel}#{anchor}]]",
+                source_line=body_line,
+                kind=kind,
+                raw_text=raw.strip(),
+            ))
     return out
 
 

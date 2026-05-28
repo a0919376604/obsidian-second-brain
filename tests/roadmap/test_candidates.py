@@ -5,12 +5,10 @@ from scripts.roadmap.candidates import Candidate, detect_candidates
 FIXTURE = Path(__file__).parent / "fixtures" / "project-a"
 
 
-def test_detects_future_md_buckets():
+def test_detects_decisions_known_limitations():
     cands = detect_candidates(FIXTURE)
     kinds = {c.kind for c in cands}
     assert "limitation" in kinds
-    assert "gap" in kinds
-    assert "aspiration" in kinds
 
 
 def test_detects_promote_to_adr():
@@ -20,21 +18,19 @@ def test_detects_promote_to_adr():
     assert any("Redis Cluster" in c.raw_text for c in promotes)
 
 
-def test_detects_todo_clusters_only_when_frequency_ge_2():
+def test_skips_legacy_roadmap_todo_clusters():
     cands = detect_candidates(FIXTURE)
     clusters = [c for c in cands if c.kind == "todo-cluster"]
-    # OAuth-flow TODOs appear 3 times in backend, 2 times in frontend -> 2 clusters
-    assert len(clusters) >= 1
-    assert any("OAuth" in c.raw_text for c in clusters)
+    assert clusters == []
 
 
 def test_candidate_carries_source_wikilink():
     cands = detect_candidates(FIXTURE)
     for c in cands:
-        if c.kind == "gap":
-            assert c.source_wikilink.startswith("[[Architecture/future")
+        if c.kind == "limitation":
+            assert c.source_wikilink.startswith("[[Architecture/decisions")
             return
-    raise AssertionError("no gap candidate found")
+    raise AssertionError("no limitation candidate found")
 
 
 def test_dedup_by_normalized_title():
@@ -121,8 +117,8 @@ def test_detect_candidates_reads_improvement_blocks_from_modules(tmp_path):
         "- **未做的風險:** webhook 可被偽造\n"
         "- **Confidence:** stated\n"
     )
-    # future.md still contributes via known-limitations (v3 keeps this section).
-    (arch / "future.md").write_text(
+    # decisions.md now contributes known-limitations (migrated from v3 future.md).
+    (arch / "decisions.md").write_text(
         "## 已知限制\n"
         "- 沒有 SSO 整合 (stated)\n"
     )
@@ -162,8 +158,8 @@ def test_detect_candidates_reads_improvements_from_overview(tmp_path):
     assert imp[0].effort == "L"
 
 
-def test_detect_candidates_v2_fallback_when_no_improvement_blocks(tmp_path):
-    """If no `## 改進機會` blocks exist (legacy v2 vault), fall back to v2 detection."""
+def test_detect_candidates_skips_legacy_future_when_no_v4_sources(tmp_path):
+    """v4 ignores legacy future.md; migration moves durable signal to decisions.md first."""
     from scripts.roadmap.candidates import detect_candidates
     arch = tmp_path / "Architecture"
     arch.mkdir(parents=True)
@@ -172,7 +168,71 @@ def test_detect_candidates_v2_fallback_when_no_improvement_blocks(tmp_path):
         "## 期望中的想法\n\n- migrate to pluggable engines\n"
     )
     cands = detect_candidates(tmp_path)
-    # Should still find these legacy candidates.
+    assert cands == []
+
+
+def test_v4_detect_candidates_skips_deleted_files(tmp_path):
+    """v4: detect_candidates does NOT read future/roadmap/jobs/api-surface/features/flows files,
+    even if they exist (legacy vault). It only reads overview + modules + decisions."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "modules").mkdir(parents=True)
+    # Overview with cross-cutting improvements
+    (arch / "overview.md").write_text(
+        "## 跨模組改進機會\n\n"
+        "### Imp 1: 拆 EventConsumer 為獨立 worker\n"
+        "- **為什麼:** 共用 process\n"
+        "- **證據:** [[modules/backend#改進機會]] Imp 1\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** 流量峰值\n"
+        "- **Confidence:** medium\n"
+    )
+    # Module with improvements
+    (arch / "modules" / "backend.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 1: 抽 sweeper\n"
+        "- **為什麼:** main.py 過大\n"
+        "- **證據:** `backend/main.py:58-388`\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** test scope 擴大\n"
+        "- **Confidence:** high\n"
+    )
+    # Decisions with promote-to-ADR
+    (arch / "decisions.md").write_text(
+        "## 建議升級為 ADR\n\n"
+        "1. **Redis vs PostgreSQL 角色釐清** — AGENTS.md 暗示未詳述\n"
+    )
+    # Legacy v3 file SHOULD BE IGNORED even if present.
+    (arch / "features.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 99: 不該被撿到\n"
+        "- **為什麼:** ...\n"
+        "- **證據:** [[fake]]\n"
+        "- **Effort:** S\n"
+        "- **未做的風險:** ...\n"
+        "- **Confidence:** speculation\n"
+    )
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    assert any("EventConsumer" in t for t in titles)
+    assert any("抽 sweeper" in t for t in titles)
+    # The deleted-file Imp must NOT be picked up.
+    assert not any("Imp 99" in t or "不該被撿到" in t for t in titles), \
+        f"v4 detect_candidates should skip features.md; got titles={titles}"
+
+
+def test_v4_detect_candidates_reads_known_limitations_in_decisions(tmp_path):
+    """The known-limitations content (migrated from future.md) becomes 'limitation' kind candidates."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    arch.mkdir(parents=True)
+    (arch / "decisions.md").write_text(
+        "## 已知限制\n\n"
+        "- backend/.env deprecated\n"
+        "- plain-text password fallback\n"
+    )
+    cands = detect_candidates(tmp_path)
     kinds = {c.kind for c in cands}
-    assert "gap" in kinds
-    assert "aspiration" in kinds
+    assert "limitation" in kinds
+    titles = [c.title for c in cands if c.kind == "limitation"]
+    assert any("env deprecated" in t for t in titles)
