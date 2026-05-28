@@ -194,3 +194,93 @@ def test_v2_lockfile_still_migrates_through_to_v4(tmp_path: Path):
     loaded = load_lockfile(target)
     assert loaded.version == 4
     assert loaded.frame == "description-v2"
+
+
+def test_lockfile_has_ai_flows_field(tmp_path: Path):
+    """v4.1 — Lockfile has an `ai_flows` dict tracking per-flow + per-prompt source-hash."""
+    import json
+    from scripts.architect.lockfile import Lockfile, load_lockfile, write_lockfile
+    lock = Lockfile(
+        version=4,
+        scanner_version="0.4.1",
+        fields={},
+        note_blocks={},
+        sections={},
+        functions={},
+        frame="report-v4",
+        ai_flows={
+            "lang-ai-customer": {
+                "signal-hash": "sha256:abc",
+                "lang": "zh-TW",
+                "framework": "langgraph",
+                "node-blocks-hash": "sha256:def",
+                "last-generated": "2026-05-28T10:00:00Z",
+                "prompts": {
+                    "intent_classifier": {
+                        "source-hash": "sha256:p1",
+                        "source": "backend/engines/langgraph/prompts/intent.py:1-25",
+                        "is_dynamic": False,
+                    },
+                    "rag_answer": {
+                        "source-hash": "sha256:p2",
+                        "source": "backend/engines/langgraph/prompts/answer.py:30-90",
+                        "is_dynamic": False,
+                    },
+                    "safety_check": {
+                        "source-hash": "sha256:dynamic",
+                        "source": "(see ai-flow note `## Prompts` body)",
+                        "is_dynamic": True,
+                    },
+                },
+            },
+        },
+    )
+    target = tmp_path / "_manifest.lock.json"
+    write_lockfile(lock, target)
+    loaded = load_lockfile(target)
+    assert "lang-ai-customer" in loaded.ai_flows
+    assert loaded.ai_flows["lang-ai-customer"]["framework"] == "langgraph"
+    assert loaded.ai_flows["lang-ai-customer"]["prompts"]["intent_classifier"]["source-hash"] == "sha256:p1"
+    assert loaded.ai_flows["lang-ai-customer"]["prompts"]["safety_check"]["is_dynamic"] is True
+
+
+def test_load_v4_lockfile_without_ai_flows_yields_empty_dict(tmp_path: Path):
+    """Old v4 lockfile (no ai_flows key) should still load — ai_flows defaults to {}."""
+    import json
+    from scripts.architect.lockfile import load_lockfile
+    target = tmp_path / "_manifest.lock.json"
+    target.write_text(json.dumps({
+        "version": 4,
+        "scanner_version": "0.4.0",
+        "fields": {},
+        "note_blocks": {},
+        "sections": {},
+        "functions": {},
+        "frame": "report-v4",
+    }))
+    loaded = load_lockfile(target)
+    assert loaded.ai_flows == {}
+
+
+def test_ai_flow_prompt_drift_helper():
+    """Lockfile helper: detect whether a prompt's source-hash changed."""
+    from scripts.architect.lockfile import Lockfile, ai_flow_prompt_changed
+    lock = Lockfile(
+        version=4, scanner_version="0.4.1",
+        fields={}, note_blocks={}, sections={}, functions={}, frame="report-v4",
+        ai_flows={
+            "lang-ai-customer": {
+                "prompts": {
+                    "intent_classifier": {"source-hash": "sha256:old"},
+                },
+            },
+        },
+    )
+    # Same hash → not changed
+    assert ai_flow_prompt_changed(lock, "lang-ai-customer", "intent_classifier", "sha256:old") is False
+    # Different hash → changed
+    assert ai_flow_prompt_changed(lock, "lang-ai-customer", "intent_classifier", "sha256:new") is True
+    # Missing prompt → changed (treat as first-time-generated)
+    assert ai_flow_prompt_changed(lock, "lang-ai-customer", "new_prompt", "sha256:anything") is True
+    # Missing flow → changed
+    assert ai_flow_prompt_changed(lock, "nonexistent-flow", "intent_classifier", "sha256:x") is True

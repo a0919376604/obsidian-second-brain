@@ -10,6 +10,7 @@ Schema versions:
       (optional --functions=public layer). Loading v1 silently migrates.
   v3: adds `frame` marker (`description-v2` legacy vs `judgment-v3`).
   v4: default frame is `report-v4`; old frames are preserved on load.
+  v4.1: adds `ai_flows` tracking per-flow + per-prompt source hashes.
 """
 
 from __future__ import annotations
@@ -31,6 +32,9 @@ class Lockfile:
     sections: dict = field(default_factory=dict)
     functions: dict = field(default_factory=dict)
     frame: str = "description-v2"  # description-v2 (legacy) | judgment-v3
+    ai_flows: dict = field(
+        default_factory=dict
+    )  # v4.1 — per-flow + per-prompt source-hash tracking
 
 
 def hash_value(s: str) -> str:
@@ -61,6 +65,7 @@ def load_lockfile(path: Path) -> Lockfile | None:
         sections=data.get("sections", {}),
         functions=data.get("functions", {}),
         frame=frame,
+        ai_flows=data.get("ai_flows", {}),
     )
 
 
@@ -96,3 +101,19 @@ def section_signal_was_changed(
     if record.get("lang") != current_lang:
         return True
     return record.get("signal-hash") != hash_value(current_signal)
+
+
+def ai_flow_prompt_changed(
+    lock: Lockfile, flow_slug: str, prompt_name: str, current_source_hash: str
+) -> bool:
+    """True iff the prompt's source-hash differs from what the lockfile recorded.
+
+    Missing flow or missing prompt entry also counts as "changed" (treat as first-time
+    materialization → regenerate the sentinel block).
+    """
+    flow = lock.ai_flows.get(flow_slug, {})
+    prompts = flow.get("prompts", {})
+    record = prompts.get(prompt_name)
+    if record is None:
+        return True
+    return record.get("source-hash") != current_source_hash
