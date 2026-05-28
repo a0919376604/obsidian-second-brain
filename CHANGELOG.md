@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `/obsidian-architect` v4 — Overview reframed from MOC to self-contained
+  top-down report. Reader opens overview.md once and gets the whole project
+  story; detail files (modules, decisions, personas) are now drill-down
+  references, not required reading. 6 obsolete files deleted in migration:
+  `future.md`, `roadmap.md`, `jobs.md`, `api-surface.md`, `features.md`,
+  `flows.md`. Their content moved:
+  - `features.md` → `overview.md` `## Capabilities` section
+  - `flows.md` → `overview.md` `## Flows` section (with Mermaid + friction)
+  - `future.md` "Known limitations" → `decisions.md` `## Known limitations`
+  - `future.md` "Aspirational ideas" → per-module `## Improvement opportunities`
+  - `roadmap.md` removed (curated roadmap is `/obsidian-roadmap`'s output)
+  - `jobs.md` removed (friction → module Imps; JTBD → capability framing)
+  - `api-surface.md` removed (machine-readable only, in `scan-report.json`)
+- `Architecture/` directory now has 8 files: `overview.md`, `modules/<5>.md`,
+  `decisions.md`, `personas.md` (down from 14).
+- Lockfile schema bumped to v4 with `frame: "report-v4"` default.
+- `/obsidian-roadmap` Phase 1 signal source narrowed to overview + modules
+  + decisions only. Same number of candidates (no improvements lost) but
+  cleaner source provenance.
+- `decisions.md` body section list gains `## Known limitations` (auto-migrated
+  from v3 `future.md` content on first v4 run).
 - `/obsidian-architect` reframed from description-driven (file-tree recital)
   to judgment-driven (design strengths / weaknesses / improvement opportunities).
   Module notes no longer contain `## Key files` sections; the codebase is
@@ -24,6 +45,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `--frame=<report|judgment|description>` flag on `/obsidian-architect`.
+  Default `report` (v4). `judgment` keeps v3 14-file output; `description`
+  restores v2 file-tree-listing behavior.
+- `--keep-deprecated` flag — skip deletion of v3 files during migration
+  (not recommended; tar.gz backup already preserves them).
+- v3 → v4 migration step: tar.gz `Architecture/_archive/...` backup;
+  `--dry-run` shows plan; auto-merges known-limitations into decisions.md.
 - `Architecture/personas.md`, `jobs.md`, `flows.md` — product-eye layer
   capturing who uses the product, what jobs they want done, and the
   end-to-end flows they traverse. Each is judgment-aware (jobs declare
@@ -35,6 +63,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - v2 → v3 migration step: drops v2 `@generated` file-tree blocks, preserves
   `@user` blocks, archives the pre-v3 Architecture/ tree to
   `_archive/architecture-pre-v3-<timestamp>.tar.gz` as a safety net.
+
+### Deprecated
+
+- `architecture-features`, `architecture-flows`, `architecture-future`,
+  `architecture-roadmap`, `architecture-jobs`, `architecture-api-surface`
+  schema types. Still callable for backward compat (with deprecation log
+  warning), but no longer emitted by the default `--frame=report` pipeline.
 
 ### `/obsidian-roadmap` integration
 
