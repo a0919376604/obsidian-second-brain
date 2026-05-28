@@ -278,3 +278,63 @@ def test_render_features_inventory_last_touch_unknown_for_missing_git_key():
     }
     md, _ = render_features_inventory(inventory, api_surface, git_last_touch={})
     assert "unknown" in md
+
+
+def test_compute_doc_sync_score_basic_ratio():
+    from scripts.architect.sections import compute_doc_sync_score
+
+    rendered_rows = [
+        {"name": "A", "status": "online", "doc_anchors": ["README.md#A"]},
+        {"name": "B", "status": "online", "doc_anchors": ["AGENTS.md L1"]},
+        {"name": "C", "status": "online", "doc_anchors": []},
+        {"name": "D", "status": "deprecated", "doc_anchors": ["README.md#D"]},
+    ]
+    score = compute_doc_sync_score(rendered_rows)
+    # 3 online; 2 have ≥1 doc → 2/3 ≈ 0.67
+    assert score == 0.67
+
+
+def test_compute_doc_sync_score_zero_online_returns_zero():
+    from scripts.architect.sections import compute_doc_sync_score
+
+    rendered_rows = [{"name": "X", "status": "deprecated", "doc_anchors": []}]
+    assert compute_doc_sync_score(rendered_rows) == 0.0
+
+
+def test_compose_features_note_emits_extra_frontmatter():
+    """compose_features_note (or equivalent helper) merges feature-count /
+    deprecated-count / doc-sync-score into the frontmatter."""
+    from scripts.architect.sections import compose_features_note
+
+    blocks = {
+        "summary": "summary text",
+        "capability-inventory": "| C | D | online | 2026-05 | — | — | [[modules/backend]] |",
+        "product-coverage": "",
+        "limitations": "- 只支援 LINE",
+        "strengths": "- **完整 lifecycle.**",
+        "weaknesses": "- **單一 channel.**",
+        "missing-features": "### A\n- **為什麼:** x",
+        "improvements": "### Imp 1\n- **為什麼:** y",
+        "doc-sync-actions": "### 清除\n- [ ] x",
+        "dependencies": "- [[Architecture/overview]]",
+    }
+    note = compose_features_note(
+        project="P",
+        repo_label="local: /tmp/p",
+        commit="abc1234",
+        signal_sources=["README.md"],
+        confidence="high",
+        output_lang="zh-TW",
+        generated_blocks=blocks,
+        feature_count=1,
+        deprecated_count=0,
+        doc_sync_score=0.84,
+    )
+    assert "feature-count: 1" in note
+    assert "deprecated-count: 0" in note
+    assert "doc-sync-score: 0.84" in note
+    # Frontmatter merged BEFORE `ai-first: true`.
+    fm_section = note.split("---", 2)[1]
+    assert "feature-count: 1" in fm_section
+    assert "ai-first: true" in fm_section
+    assert fm_section.index("feature-count") < fm_section.index("ai-first")

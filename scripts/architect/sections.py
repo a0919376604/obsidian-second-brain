@@ -1203,6 +1203,51 @@ def _api_surface_entry_file(entry: dict) -> str:
     return source.rsplit(":", 1)[0]
 
 
+def compute_doc_sync_score(rendered_rows: list[dict]) -> float:
+    """Doc-sync-score = online rows with ≥1 doc_anchor ÷ total online rows.
+
+    Returns 0.0 if no online rows. Rounded to 2 decimals.
+    """
+    online = [r for r in rendered_rows if r.get("status") == "online"]
+    if not online:
+        return 0.0
+    with_doc = sum(1 for r in online if r.get("doc_anchors"))
+    return round(with_doc / len(online), 2)
+
+
+def compose_features_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    feature_count: int,
+    deprecated_count: int,
+    doc_sync_score: float,
+) -> str:
+    """Wraps compose_note(section='features', ...) and merges three extra
+    frontmatter fields BEFORE the `ai-first: true` line."""
+    note = compose_note(
+        section="features",
+        project=project,
+        repo_label=repo_label,
+        commit=commit,
+        signal_sources=signal_sources,
+        confidence=confidence,
+        output_lang=output_lang,
+        generated_blocks=generated_blocks,
+    )
+    extra_fm = (
+        f"feature-count: {feature_count}\n"
+        f"deprecated-count: {deprecated_count}\n"
+        f"doc-sync-score: {doc_sync_score:.2f}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def render_prompts_block(
     inventory: list[dict],
     annotations: dict[str, dict],
