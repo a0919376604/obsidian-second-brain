@@ -528,12 +528,12 @@ Steps:
 **Codebase architecture documentation.**
 
 - `/obsidian-architect <repo-path>` — Generate a self-contained, top-down
-  architecture report (v4). Reader opens `Architecture/overview.md` once
-  and gets purpose → system diagram → stack → capabilities → flows →
-  module map → cross-cutting improvements → drill-down. Detail files
-  (5 per-module judgment notes + decisions + personas) are drill-down
-  references only. 8 files total; no MOC fragmentation. Feeds
-  `/obsidian-roadmap` Phase 1 via `## Improvement opportunities` blocks.
+  architecture report. 8 files: `overview.md` + 5 module judgment notes +
+  `decisions.md` + `personas.md`. For projects with detected AI subsystems
+  (LangGraph / LangChain / custom-pipeline), adds `ai-flows/<slug>.md` per
+  AI flow with full prompts (collapsible callout), graph topology, state
+  schema, LLM config, eval gaps, and design judgment. Feeds
+  `/obsidian-roadmap` Phase 1 via cross-cutting + module + AI flow Imps.
 
 ---
 

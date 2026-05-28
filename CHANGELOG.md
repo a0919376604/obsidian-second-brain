@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `/obsidian-architect` v4.1 — AI Flows layer. Scanner auto-detects LangGraph,
+  LangChain, and custom-pipeline AI subsystems (threshold: ≥ 3 nodes) and
+  produces `Architecture/ai-flows/<slug>.md` per flow. Each note has 10 body
+  sections: Purpose / Graph topology / State schema / Prompts / LLM config /
+  Evaluation / Strengths / Weaknesses / Improvements / Dependencies.
+- Full prompt text embedded in vault via Obsidian collapsible callout
+  (`> [!quote]-`) for AI-first self-contained context. Per-prompt sentinel
+  with source-hash tracking in lockfile — only modified prompts regenerate
+  their block on refresh.
+- New `architecture-ai-flow` type in `references/ai-first-rules.md`.
+- Host module notes gain a sentinel-wrapped `**AI engine:** [[ai-flows/<slug>]]`
+  line when they host a detected flow.
+- `--no-ai-flows` flag opts out (e.g. for projects where the AI layer should
+  remain in module notes).
+
+### Changed
+
+- `/obsidian-roadmap` Phase 1 signal source extended: now also walks
+  `Architecture/ai-flows/*.md` for `## Improvement opportunities` blocks.
+- Lockfile schema (still v4, no version bump) gains an `ai_flows` field with
+  per-flow + per-prompt source-hash tracking.
+
+### Detection rules
+
+- LangGraph: `langgraph` dep OR `from langgraph` import + `graph.py` + ≥ 3 nodes
+- LangChain: `langchain` dep (without langgraph) + ≥ 3 nodes
+- Custom-pipeline: `pipeline.py` + `nodes/` + prompts file + OpenAI/Anthropic/Gemini lib
+- Projects without these signals get no `ai-flows/` directory (zero cost).
+
 ### Changed
 
 - `/obsidian-architect` v4 — Overview reframed from MOC to self-contained

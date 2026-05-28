@@ -16,6 +16,20 @@ hint: Disable this message with "git config set advice.addIgnoredFile false"
 `dist/` path. The adapter build itself succeeded, and `dist/` had no tracked
 changes in `git status --short`.
 
+Task 14 commit staging hit the same ignored-path issue. The exact command
+`git add CHANGELOG.md SKILL.md README.md dist/` returned:
+
+```text
+The following paths are ignored by one of your .gitignore files:
+dist
+hint: Use -f if you really want to add them.
+hint: Disable this message with "git config set advice.addIgnoredFile false"
+```
+
+`CHANGELOG.md`, `README.md`, `SKILL.md`, and the tracked
+`dist/claude-code/SKILL.md` build output were staged before Git reported the
+ignored `dist/` path.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 v4 之上加 `architecture-ai-flow` 一層 — scanner 自動偵測 LangGraph / LangChain / custom-pipeline 三種 AI 子系統,在 `Architecture/ai-flows/<slug>.md` 寫 10 段判斷型文件,每個 prompt 全文嵌入 collapsible callout 並用 per-prompt sentinel + source-hash drift refresh。
