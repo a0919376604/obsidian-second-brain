@@ -951,6 +951,80 @@ def build_ai_flow_prompt(
     ])
 
 
+def render_prompts_block(
+    inventory: list[dict],
+    annotations: dict[str, dict],
+    lang: str = "en",
+) -> str:
+    """Render the `## Prompts` block body for an ai-flow note.
+
+    Each prompt becomes:
+      - H3 with the prompt name
+      - 4 metadata bullets (Purpose, Source, Model, Type)
+      - Per-prompt @generated sentinel wrapping a collapsible callout (static)
+        OR an inline description (dynamic)
+
+    Args:
+        inventory: list of ExtractedPrompt-asdict (from scan-report.json's ai_flows[N].prompts).
+        annotations: dict[prompt-name → {purpose: str, type_note: str}] — the agent's per-prompt copy.
+        lang: 'en' | 'zh-TW'.
+    """
+    if not inventory:
+        return (
+            "(未偵測到 prompts;若有動態組合 prompt,請手動補入 @user 區塊)"
+            if lang == "zh-TW"
+            else "(no static prompts extracted; add dynamic prompts manually in @user blocks)"
+        )
+
+    labels = {
+        "zh-TW": {"purpose": "用途", "type_static": "static template", "type_dynamic": "dynamic",
+                  "callout": "> [!quote]- 完整 prompt"},
+        "en": {"purpose": "Purpose", "type_static": "static template", "type_dynamic": "dynamic",
+               "callout": "> [!quote]- Full prompt"},
+    }[lang]
+
+    out: list[str] = []
+    for entry in inventory:
+        name = entry["name"]
+        slug = _slugify_prompt(name)
+        purpose = annotations.get(name, {}).get("purpose", "(LLM 未補上 / not annotated)")
+        type_value = labels["type_dynamic"] if entry.get("is_dynamic") else labels["type_static"]
+        type_note = annotations.get(name, {}).get("type_note", "")
+        if type_note:
+            type_value = f"{type_value} — {type_note}"
+
+        out.append(f"### {name}")
+        out.append(f"- **{labels['purpose']}:** {purpose}")
+        out.append(f"- **Source:** `{entry['source']}`")
+        model = entry.get("model_hint") or "?"
+        out.append(f"- **Model:** {model}")
+        out.append(f"- **Type:** {type_value}")
+        out.append("")
+        out.append(f"<!-- @generated:start prompt-{slug} -->")
+        if entry.get("is_dynamic"):
+            # Dynamic prompts: inline description, no collapsible callout.
+            out.append(entry["body"])
+        else:
+            out.append(labels["callout"])
+            out.append("> ````")
+            for line in entry["body"].splitlines():
+                out.append(f"> {line}")
+            out.append("> ````")
+        out.append(f"<!-- @generated:end prompt-{slug} -->")
+        out.append("")
+    return "\n".join(out).rstrip() + "\n"
+
+
+_SLUG_NORM_RE = re.compile(r"[^a-z0-9-]+")
+
+
+def _slugify_prompt(name: str) -> str:
+    """Prompt name → ascii-lowercase-hyphen slug suitable for sentinel name."""
+    s = name.lower()
+    s = _SLUG_NORM_RE.sub("-", s).strip("-")
+    return s or "unknown"
+
+
 def build_module_prompt(
     *,
     module_slug: str,

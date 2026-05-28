@@ -875,3 +875,60 @@ def test_build_ai_flow_prompt_en_no_chinese():
     )
     assert "繁體中文" not in prompt
     assert "English" in prompt or "en" in prompt
+
+
+def test_render_prompts_block_static_creates_collapsible_callout():
+    from scripts.architect.sections import render_prompts_block
+    inventory = [
+        {
+            "name": "intent_classifier",
+            "source": "backend/engines/langgraph/prompts/intent.py:1-25",
+            "body": "You are an intent classifier.\nUser: {user_message}\n",
+            "is_dynamic": False,
+            "model_hint": "gemini-flash",
+        },
+    ]
+    annotations = {
+        "intent_classifier": {"purpose": "把客戶訊息分類", "type_note": ""},
+    }
+    rendered = render_prompts_block(inventory, annotations, lang="zh-TW")
+    # H3 + metadata + sentinel + callout
+    assert "### intent_classifier" in rendered
+    assert "**用途:**" in rendered or "**Purpose:**" in rendered
+    assert "**Source:** `backend/engines/langgraph/prompts/intent.py:1-25`" in rendered
+    assert "**Model:** gemini-flash" in rendered
+    assert "**Type:** static template" in rendered
+    assert "<!-- @generated:start prompt-intent-classifier -->" in rendered
+    assert "<!-- @generated:end prompt-intent-classifier -->" in rendered
+    assert "> [!quote]- 完整 prompt" in rendered
+    assert "You are an intent classifier" in rendered
+    assert "{user_message}" in rendered  # preserved
+
+
+def test_render_prompts_block_dynamic_omits_collapsible_callout():
+    from scripts.architect.sections import render_prompts_block
+    inventory = [
+        {
+            "name": "build_system_prompt",
+            "source": "agent.py:10",
+            "body": "Assembled from _BASE + persona block at utils/persona.py:42 + tools list at runtime.",
+            "is_dynamic": True,
+            "model_hint": "gpt-4o",
+        },
+    ]
+    annotations = {"build_system_prompt": {"purpose": "Runtime-assembled system prompt", "type_note": "Dynamic"}}
+    rendered = render_prompts_block(inventory, annotations, lang="zh-TW")
+    assert "### build_system_prompt" in rendered
+    assert "**Type:** dynamic" in rendered
+    # NO collapsible callout for dynamic
+    assert "[!quote]" not in rendered
+    # But still wrapped in sentinel for refresh
+    assert "<!-- @generated:start prompt-build-system-prompt -->" in rendered
+    # And the description IS visible (not hidden)
+    assert "Assembled from _BASE" in rendered
+
+
+def test_render_prompts_block_empty_inventory():
+    from scripts.architect.sections import render_prompts_block
+    rendered = render_prompts_block([], {}, lang="zh-TW")
+    assert "(no static prompts extracted)" in rendered or "未偵測到 prompts" in rendered
