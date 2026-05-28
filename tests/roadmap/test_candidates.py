@@ -327,3 +327,83 @@ def test_detect_candidates_features_imp_without_research_is_normal_priority(tmp_
     shift = next((c for c in cands if "Shift handoff" in c.title), None)
     assert shift is not None
     assert shift.priority == "normal"
+
+
+def test_detect_candidates_dedup_features_vs_module(tmp_path):
+    """When features.md Imp and module Imp cite same Evidence wikilink,
+    features.md wins; module Imp is dropped or marked child."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    (arch / "modules").mkdir(parents=True)
+    (arch / "features.md").write_text(
+        "---\ntype: architecture-features\n---\n\n"
+        "## 改進機會\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Streaming reply\n"
+        "- **為什麼:** UX 體感落後\n"
+        "- **證據:** [[Architecture/modules/backend#改進機會]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 競品先上\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    (arch / "modules" / "backend.md").write_text(
+        "---\ntype: architecture-module\n---\n\n"
+        "## 改進機會\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Streaming reply tech impl\n"
+        "- **為什麼:** llm.invoke 改 stream\n"
+        "- **證據:** [[Architecture/modules/backend#改進機會]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 無\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    # Features.md Imp wins; module Imp deduped.
+    titles = [c.title for c in cands]
+    assert "Streaming reply" in titles
+    assert "Streaming reply tech impl" not in titles, (
+        f"expected module Imp deduped against features Imp; got {titles}"
+    )
+
+
+def test_detect_candidates_dedup_features_vs_module_when_module_imp_is_structured(tmp_path):
+    """Features.md wins when a parsed module Imp cites the same Evidence wikilink."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    (arch / "modules").mkdir(parents=True)
+    (arch / "features.md").write_text(
+        "---\ntype: architecture-features\n---\n\n"
+        "## 改進機會\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Streaming reply\n"
+        "- **為什麼:** UX 體感落後\n"
+        "- **證據:** [[Architecture/modules/backend#改進機會]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 競品先上\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    (arch / "modules" / "backend.md").write_text(
+        "---\ntype: architecture-module\n---\n\n"
+        "## 改進機會\n"
+        "### Imp 1: Streaming reply tech impl\n"
+        "- **為什麼:** llm.invoke 改 stream\n"
+        "- **證據:** [[Architecture/modules/backend#改進機會]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 無\n"
+        "- **Confidence:** stated\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    assert "Streaming reply" in titles
+    assert "Streaming reply tech impl" not in titles, (
+        f"expected module Imp deduped against features Imp; got {titles}"
+    )

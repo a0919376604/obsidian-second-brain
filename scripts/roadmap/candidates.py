@@ -93,7 +93,7 @@ def detect_candidates(project_root: Path) -> list[Candidate]:
     if (arch / "features.md").is_file():
         out.extend(_extract_features_candidates(arch / "features.md", arch))
 
-    return _dedup(out)
+    return _dedup(_dedup_candidates(out))
 
 
 _KNOWN_LIM_SECTIONS = {
@@ -419,3 +419,41 @@ def _dedup(cands: list[Candidate]) -> list[Candidate]:
         seen.add(key)
         out.append(c)
     return out
+
+
+def _dedup_candidates(candidates: list[Candidate]) -> list[Candidate]:
+    """Dedup module Imps against features.md Imps when they share Evidence wikilinks.
+
+    Features.md (PM lens) wins. Module Imps with overlapping Evidence are dropped.
+    """
+    features_evidence_set: set[str] = set()
+    for c in candidates:
+        if _is_features_candidate(c):
+            for wl in _extract_wikilinks(" | ".join(c.evidence)):
+                features_evidence_set.add(wl)
+
+    deduped: list[Candidate] = []
+    for c in candidates:
+        if _is_features_candidate(c):
+            deduped.append(c)
+            continue
+        # Module / overview / decisions candidates: drop if any evidence wikilink
+        # is in features_evidence_set.
+        if any(wl in features_evidence_set for wl in _extract_wikilinks(" | ".join(c.evidence))):
+            continue
+        deduped.append(c)
+    return deduped
+
+
+def _is_features_candidate(candidate: Candidate) -> bool:
+    return (
+        (candidate.source is not None and "features.md" in candidate.source)
+        or "Architecture/features" in candidate.source_wikilink
+    )
+
+
+_WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]")
+
+
+def _extract_wikilinks(text: str) -> list[str]:
+    return _WIKILINK_RE.findall(text)
