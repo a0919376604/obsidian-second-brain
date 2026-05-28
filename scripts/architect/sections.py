@@ -492,19 +492,30 @@ def compose_overview(
     entry_points: list[dict],
     generated_blocks: dict[str, str],
 ) -> str:
-    """Compose the MOC-style overview.md."""
+    """Compose the v4 top-down report overview.md.
+
+    Body sections (in order):
+      1. Purpose & audience (LLM block: `purpose`)
+      2. System diagram (LLM block: `system-diagram`)
+      3. Stack (deterministic mirror of frontmatter `stack`)
+      4. Capabilities (LLM block: `capabilities`)
+      5. Flows (LLM block: `flows`)
+      6. Module map (deterministic from `modules` arg)
+      7. Cross-cutting improvements (LLM block: `cross-cutting-improvements`)
+      8. Drill-down entries (deterministic wikilinks)
+    """
     today = date.today().isoformat()
     fm = [
         "---",
         "type: architecture-overview",
-        "moc-style: true",
+        "report-style: true",
         f"date: {today}",
         f'project: "[[{project}]]"',
         *_repo_yaml_lines(repo_label),
         f"last-scanned: {today}",
         f"commit: {commit}",
         f"lang: {output_lang}",
-        "tags: [architecture, codebase-doc, moc]",
+        "tags: [architecture, codebase-doc, report]",
         "ai-first: true",
         "status: current",
     ]
@@ -512,82 +523,111 @@ def compose_overview(
         fm.append(_yaml_block("stack", stack))
     fm.append("---")
 
-    body = [
-        "",
-        heading("## For future Claude", output_lang),
-    ]
+    body: list[str] = ["", heading("## For future Claude", output_lang)]
     if output_lang == "zh-TW":
-        body.append("這個檔是 MOC。不要直接讀這裡的內容,跟著 wikilink 走。每個深入內容在自己的 note,future-Claude 想 grep 一段就 grep 那一段。")
+        body.append(
+            "本檔一次說完整個 project 的設計。打開這個檔就懂全貌,detail 在 "
+            "[[modules/...]] / [[decisions]] / [[personas]]。"
+        )
     else:
-        body.append("This note is a MOC. Don't read it for content — follow the wikilinks. Each deep-dive lives in its own note so you can grep one without loading the rest.")
+        body.append(
+            "This single file tells the whole project story top-down. Drill into "
+            "[[modules/...]] / [[decisions]] / [[personas]] when you need more detail."
+        )
     body.append("")
 
-    # Purpose (LLM block).
-    if generated_blocks.get("purpose"):
-        body.append(heading("## Purpose", output_lang))
+    # 1. Purpose & audience (LLM block)
+    body.append(heading("## Purpose & audience", output_lang))
+    purpose = generated_blocks.get("purpose", "").strip()
+    if purpose:
         body.append("<!-- @generated:start purpose -->")
-        body.append(generated_blocks["purpose"])
+        body.append(purpose)
         body.append("<!-- @generated:end purpose -->")
-        body.append("")
+    body.append("")
 
-    # Stack (mirrors frontmatter, deterministic).
+    # 2. System diagram (LLM block, expects Mermaid inside)
+    body.append(heading("## System diagram", output_lang))
+    diagram = generated_blocks.get("system-diagram", "").strip()
+    if diagram:
+        body.append("<!-- @generated:start system-diagram -->")
+        body.append(diagram)
+        body.append("<!-- @generated:end system-diagram -->")
+    body.append("")
+
+    # 3. Stack (deterministic mirror of frontmatter)
+    body.append(heading("## Stack", output_lang))
     if stack:
-        body.append(heading("## Stack", output_lang))
         for k, v in stack.items():
+            if k == "modules":
+                continue  # internal nesting, don't expand here
             if isinstance(v, list):
                 body.append(f"- **{k}:** {', '.join(str(x) for x in v)}")
             else:
                 body.append(f"- **{k}:** {v}")
-        suffix = "(見 [[Architecture/decisions]] 的理由)" if output_lang == "zh-TW" else "(see [[Architecture/decisions]] for rationale)"
-        body.append("")
-        body.append(suffix)
-        body.append("")
-
-    # Capability MOC (deterministic).
-    body.append(heading("## Capability MOC", output_lang))
-    body.append("- [[Architecture/features]]")
-    body.append("- [[Architecture/roadmap]]")
-    body.append("- [[Architecture/decisions]]")
-    body.append("- [[Architecture/future]]")
-    body.append("")
-    body.append(heading("## API surface", output_lang))
-    body.append("- [[Architecture/api-surface]]")
+        if output_lang == "zh-TW":
+            body.append("- (完整理由見 [[decisions#技術棧理由]])")
+        else:
+            body.append("- (Full rationale in [[decisions#Stack rationale]])")
+    else:
+        body.append(
+            "- (No stack detected. Add `pyproject.toml` / `package.json` at repo root.)"
+            if output_lang == "en"
+            else "- (Scanner 未偵測到 stack。請在 repo root 加 `pyproject.toml` / `package.json`。)"
+        )
     body.append("")
 
-    # Structure MOC (deterministic).
-    body.append(heading("## Structure MOC", output_lang))
+    # 4. Capabilities (LLM block)
+    body.append(heading("## Capabilities", output_lang))
+    caps = generated_blocks.get("capabilities", "").strip()
+    if caps:
+        body.append("<!-- @generated:start capabilities -->")
+        body.append(caps)
+        body.append("<!-- @generated:end capabilities -->")
+    body.append("")
+
+    # 5. Flows (LLM block)
+    body.append(heading("## Flows", output_lang))
+    flows = generated_blocks.get("flows", "").strip()
+    if flows:
+        body.append("<!-- @generated:start flows -->")
+        body.append(flows)
+        body.append("<!-- @generated:end flows -->")
+    body.append("")
+
+    # 6. Module map (deterministic)
+    body.append(heading("## Module map", output_lang))
     for m in modules:
-        body.append(f"- [[modules/{m['slug']}]]")
-    if entry_points:
-        ep_label = "Entry points" if output_lang == "en" else "進入點"
-        body.append(f"- **{ep_label}:**")
-        for ep in entry_points:
-            body.append(f"  - `{ep['label']}` -> `{ep['path']}`")
+        slug = m["slug"]
+        display = m.get("display_name", slug)
+        body.append(f"- **{display}** — [[modules/{slug}]]")
     body.append("")
 
-    # Layer map (LLM block).
-    if generated_blocks.get("layer-map"):
-        body.append(heading("## Layer map", output_lang))
-        body.append("<!-- @generated:start layer-map -->")
-        body.append(generated_blocks["layer-map"])
-        body.append("<!-- @generated:end layer-map -->")
-        body.append("")
+    # 7. Cross-cutting improvements (LLM block, contains Imp 1/2/3 strict format)
+    body.append(heading("## Cross-cutting improvements", output_lang))
+    imps = generated_blocks.get("cross-cutting-improvements", "").strip()
+    if imps:
+        body.append("<!-- @generated:start cross-cutting-improvements -->")
+        body.append(imps)
+        body.append("<!-- @generated:end cross-cutting-improvements -->")
+    body.append("")
 
-    # External deps (LLM block, deterministic-ish).
-    if generated_blocks.get("external-deps"):
-        body.append(heading("## External dependencies", output_lang))
-        body.append("<!-- @generated:start external-deps -->")
-        body.append(generated_blocks["external-deps"])
-        body.append("<!-- @generated:end external-deps -->")
-        body.append("")
-
-    # Key abstractions (LLM).
-    if generated_blocks.get("key-abstractions"):
-        body.append(heading("## Key abstractions", output_lang))
-        body.append("<!-- @generated:start key-abstractions -->")
-        body.append(generated_blocks["key-abstractions"])
-        body.append("<!-- @generated:end key-abstractions -->")
-        body.append("")
+    # 8. Drill-down entries (deterministic)
+    body.append(heading("## Drill-down entries", output_lang))
+    if output_lang == "zh-TW":
+        body.append("- **模組設計判斷:** " + " | ".join(
+            f"[[modules/{m['slug']}]]" for m in modules
+        ) if modules else "- **模組設計判斷:** (尚未偵測到模組)")
+        body.append("- **完整技術決定 + ADR 候選 + 已知限制:** [[decisions]]")
+        body.append("- **使用者型態 reference:** [[personas]]")
+        body.append("- **Curated Roadmap + Tasks backlog:** [[Roadmap]] (由 `/obsidian-roadmap` 產出)")
+    else:
+        body.append("- **Per-module design judgment:** " + " | ".join(
+            f"[[modules/{m['slug']}]]" for m in modules
+        ) if modules else "- **Per-module design judgment:** (no modules detected)")
+        body.append("- **Full technical decisions + ADR candidates + Known limitations:** [[decisions]]")
+        body.append("- **Persona reference:** [[personas]]")
+        body.append("- **Curated Roadmap + Tasks backlog:** [[Roadmap]] (from `/obsidian-roadmap`)")
+    body.append("")
 
     body.append(heading("## Related", output_lang))
     body.append(f"- [[{project}]]")

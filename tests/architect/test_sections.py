@@ -338,7 +338,7 @@ def test_compose_function_note_zh_tw_translates_headings():
     assert "## 功能說明" in note
 
 
-def test_compose_overview_en_emits_moc():
+def test_compose_overview_en_emits_report():
     from scripts.architect.sections import compose_overview
     note = compose_overview(
         project="myproj",
@@ -356,13 +356,14 @@ def test_compose_overview_en_emits_moc():
         },
     )
     assert "type: architecture-overview" in note
-    assert "moc-style: true" in note
+    assert "report-style: true" in note
+    assert "moc-style:" not in note
     assert "primary-language: Python" in note
-    assert "## Capability MOC" in note
-    assert "[[Architecture/features]]" in note
-    assert "[[Architecture/api-surface]]" in note
+    assert "## Purpose & audience" in note
+    assert "## Module map" in note
     assert "[[modules/cli]]" in note
-    assert "graph TD" in note
+    assert "[[modules/api]]" in note
+    assert "[[decisions]]" in note
 
 
 def test_compose_overview_zh_tw_translates_and_omits_empty_stack():
@@ -378,7 +379,8 @@ def test_compose_overview_zh_tw_translates_and_omits_empty_stack():
         generated_blocks={},
     )
     assert "## 給未來 Claude" in note
-    assert "## 能力地圖 MOC" in note
+    assert "## 這是什麼 / 為誰服務" in note
+    assert "## 模組地圖" in note
     assert "stack:" not in note  # empty stack omitted per spec §5.7
 
 
@@ -616,3 +618,113 @@ def test_deprecated_section_types_marked():
     for s in ("api-surface", "features", "roadmap", "future", "jobs", "flows"):
         assert s in SECTION_TYPES, f"{s} still in SECTION_TYPES (kept for backward compat)"
         assert s in DEPRECATED_SECTIONS, f"{s} should be in DEPRECATED_SECTIONS"
+
+
+def test_compose_overview_v4_emits_8_body_sections_zh_tw():
+    """v4 overview writes a self-contained report, not a MOC."""
+    from scripts.architect.sections import compose_overview
+    note = compose_overview(
+        project="x",
+        repo_label="local: /tmp/x",
+        commit="abc1234",
+        stack={"primary-language": "Python", "frameworks": ["FastAPI"]},
+        output_lang="zh-TW",
+        modules=[
+            {"slug": "backend", "display_name": "Backend"},
+            {"slug": "frontend", "display_name": "Frontend"},
+        ],
+        entry_points=[],
+        generated_blocks={
+            "purpose": "Project does Y for Z personas.",
+            "system-diagram": "```mermaid\ngraph TD\n  A-->B\n```",
+            "capabilities": "### Auth\n- login\n### Webhook\n- LINE webhook",
+            "flows": "### Flow 1: foo\n```mermaid\nsequenceDiagram\n```\n",
+            "cross-cutting-improvements": "### Imp 1: ...",
+        },
+    )
+    # frontmatter
+    assert "type: architecture-overview" in note
+    assert "report-style: true" in note
+    assert "moc-style:" not in note  # v3 marker absent
+    # 8 H2 sections (zh-TW)
+    assert "## 給未來 Claude" in note
+    assert "## 這是什麼 / 為誰服務" in note
+    assert "## 系統架構圖" in note
+    assert "## 技術棧" in note
+    assert "## 核心能力" in note
+    assert "## 核心使用流程" in note
+    assert "## 模組地圖" in note
+    assert "## 跨模組改進機會" in note
+    assert "## 想深讀的入口" in note
+    # Module-map section auto-renders deterministic wikilinks (independent of LLM blocks)
+    assert "[[modules/backend]]" in note
+    assert "[[modules/frontend]]" in note
+    # Drill-down section lists deterministic wikilinks
+    assert "[[decisions]]" in note
+    assert "[[personas]]" in note
+
+
+def test_compose_overview_v4_en():
+    from scripts.architect.sections import compose_overview
+    note = compose_overview(
+        project="x",
+        repo_label="github.com/x/y",
+        commit="abc1234",
+        stack={"primary-language": "Python"},
+        output_lang="en",
+        modules=[{"slug": "backend", "display_name": "Backend"}],
+        entry_points=[],
+        generated_blocks={"purpose": "Does X.", "system-diagram": "```mermaid\ngraph TD\n  A\n```"},
+    )
+    for h in [
+        "## For future Claude",
+        "## Purpose & audience",
+        "## System diagram",
+        "## Stack",
+        "## Capabilities",
+        "## Flows",
+        "## Module map",
+        "## Cross-cutting improvements",
+        "## Drill-down entries",
+    ]:
+        assert h in note, f"missing heading {h!r}"
+
+
+def test_compose_overview_v4_module_map_renders_each_module_one_line():
+    from scripts.architect.sections import compose_overview
+    note = compose_overview(
+        project="x",
+        repo_label="local: /tmp/x",
+        commit="a",
+        stack={},
+        output_lang="zh-TW",
+        modules=[
+            {"slug": "backend", "display_name": "Backend"},
+            {"slug": "frontend", "display_name": "Frontend"},
+            {"slug": "services", "display_name": "Services"},
+        ],
+        entry_points=[],
+        generated_blocks={},
+    )
+    # Each module appears as a one-line bullet with its wikilink.
+    assert "[[modules/backend]]" in note
+    assert "[[modules/frontend]]" in note
+    assert "[[modules/services]]" in note
+
+
+def test_compose_overview_v4_drill_down_links_to_keep_files():
+    """Drill-down section links to overview/decisions/personas/Roadmap (the v4 keep set)."""
+    from scripts.architect.sections import compose_overview
+    note = compose_overview(
+        project="x", repo_label="local: /tmp/x", commit="a",
+        stack={}, output_lang="zh-TW", modules=[], entry_points=[],
+        generated_blocks={},
+    )
+    drill_section = note[note.index("## 想深讀的入口"):]
+    assert "[[decisions]]" in drill_section
+    assert "[[personas]]" in drill_section
+    assert "[[Roadmap]]" in drill_section  # produced by /obsidian-roadmap
+    # Does NOT link to obsolete files
+    for obsolete in ("api-surface", "features", "future", "roadmap", "jobs", "flows"):
+        assert f"[[{obsolete}]]" not in drill_section, \
+            f"drill-down should not reference deleted v3 file {obsolete!r}"
