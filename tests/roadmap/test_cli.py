@@ -6,15 +6,29 @@ from pathlib import Path
 
 def _make_minimal_project(root: Path):
     arch = root / "Architecture"
-    arch.mkdir(parents=True)
-    (arch / "future.md").write_text(
-        "## 落差分析\n\n- README 提到 streaming API 但 api-surface 沒對應 endpoint\n"
-        "## 期望中的想法\n\n- 把 AI 引擎抽象成 pluggable adapter\n"
+    (arch / "modules").mkdir(parents=True)
+    (arch / "overview.md").write_text(
+        "## 跨模組改進機會\n\n"
+        "### Imp 1: 抽 AI 引擎 adapter\n"
+        "- **為什麼:** 目前 provider 切換成本高\n"
+        "- **證據:** [[modules/backend#改進機會]] Imp 1 | [[modules/frontend#改進機會]] Imp 1\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** vendor lock-in\n"
+        "- **Confidence:** medium\n"
+    )
+    (arch / "modules" / "backend.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 1: 加 streaming API\n"
+        "- **為什麼:** UI 需要即時回饋\n"
+        "- **證據:** `backend/main.py:42`\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 回覆延遲高\n"
+        "- **Confidence:** high\n"
     )
     (arch / "decisions.md").write_text(
         "## 建議升級為 ADR\n\n1. **為什麼 Redis Cluster** — TBD\n"
+        "\n## 已知限制\n\n- backend/.env deprecated\n"
     )
-    (arch / "roadmap.md").write_text("## 給未來 Claude\n empty roadmap\n")
 
 
 def test_cli_dry_run_emits_candidates(tmp_path: Path):
@@ -35,8 +49,8 @@ def test_cli_dry_run_emits_candidates(tmp_path: Path):
     data = json.loads(candidates_file.read_text())
     assert len(data) >= 3
     kinds = {c["kind"] for c in data}
-    assert "gap" in kinds
-    assert "aspiration" in kinds
+    assert "improvement" in kinds
+    assert "limitation" in kinds
     assert "promote-to-adr" in kinds
 
 
