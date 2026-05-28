@@ -590,3 +590,29 @@ def test_enforce_evidence_required_drops_imps_without_evidence():
     assert filtered[0].title == "A"
     # With require=False, both survive (debug mode).
     assert len(enforce_evidence_required(items, require=False)) == 2
+
+
+def test_overview_v4_block_names_are_top_down_report():
+    """v4 overview has 8 body sections matching the top-down report structure."""
+    from scripts.architect.sections import _BLOCK_NAMES
+    assert "overview" in _BLOCK_NAMES
+    expected = (
+        "purpose",
+        "system-diagram",
+        "stack-summary",
+        "capabilities",
+        "flows",
+        "module-map",
+        "cross-cutting-improvements",
+        "drill-down",
+    )
+    assert _BLOCK_NAMES["overview"] == expected, \
+        f"v4 overview should have these 8 blocks in order, got: {_BLOCK_NAMES['overview']}"
+
+
+def test_deprecated_section_types_marked():
+    """v4 marks 6 deprecated SECTION_TYPES entries (still callable for backward compat)."""
+    from scripts.architect.sections import SECTION_TYPES, DEPRECATED_SECTIONS
+    for s in ("api-surface", "features", "roadmap", "future", "jobs", "flows"):
+        assert s in SECTION_TYPES, f"{s} still in SECTION_TYPES (kept for backward compat)"
+        assert s in DEPRECATED_SECTIONS, f"{s} should be in DEPRECATED_SECTIONS"

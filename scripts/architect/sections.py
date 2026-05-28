@@ -32,6 +32,7 @@ SECTION_FILENAMES = {
 
 # Section -> frontmatter `type:` value.
 SECTION_TYPES = {
+    "overview": "architecture-overview",
     "api-surface": "architecture-api-surface",
     "features": "architecture-features",
     "decisions": "architecture-decisions",
@@ -137,19 +138,37 @@ _PROMPT_LANG_RULES_ZH = (
 
 # Required @generated block names per section (preamble + body composition).
 _BLOCK_NAMES = {
-    "api-surface": ("summary", "interface-overview", "env-overview"),
-    "features": ("summary", "capability-scope", "strengths", "weaknesses", "improvements"),
+    "api-surface": ("summary", "interface-overview", "env-overview"),  # DEPRECATED in v4
+    "features": ("summary", "capability-scope", "strengths", "weaknesses", "improvements"),  # DEPRECATED
     "decisions": ("summary", "stack-rationale", "detected-adrs", "pattern-decisions",
-                  "commit-message-decisions", "promote-to-adr"),
-    "roadmap": ("summary", "near-term", "trajectory", "todo-clusters", "signals-reviewed"),
-    "future": ("summary", "known-limitations", "improvements"),
+                  "commit-message-decisions", "promote-to-adr", "known-limitations"),
+    "roadmap": ("summary", "near-term", "trajectory", "todo-clusters", "signals-reviewed"),  # DEPRECATED
+    "future": ("summary", "known-limitations", "improvements"),  # DEPRECATED
     # v3 module-type — judgment-driven, no file recital.
     "module": ("scope", "strengths", "weaknesses", "improvements", "dependencies"),
+    # v4 overview — 8 top-down report sections.
+    "overview": (
+        "purpose",
+        "system-diagram",
+        "stack-summary",
+        "capabilities",
+        "flows",
+        "module-map",
+        "cross-cutting-improvements",
+        "drill-down",
+    ),
     # v3 product-eye new types
     "personas": ("summary", "personas-list"),
-    "jobs": ("summary", "jobs-list"),
-    "flows": ("summary", "flows-list"),
+    "jobs": ("summary", "jobs-list"),  # DEPRECATED
+    "flows": ("summary", "flows-list"),  # DEPRECATED
 }
+
+# v4 — these sections are still callable for backward compat but no longer
+# emitted by the default `--frame=report` pipeline. The v3 vault migration
+# deletes their vault files; the schema entries stay so old vaults still load.
+DEPRECATED_SECTIONS = frozenset({
+    "api-surface", "features", "roadmap", "future", "jobs", "flows",
+})
 
 # Canonical English H2 heading per @generated block name. Translated at render
 # time via lang.heading() for zh-TW vaults. Keys are the SAME slug-style names
@@ -184,6 +203,15 @@ _BLOCK_HEADINGS = {
     "personas-list": "## Personas",
     "jobs-list": "## Jobs to be done",
     "flows-list": "## Flows",
+    # v4 overview report sections
+    "purpose": "## Purpose & audience",
+    "system-diagram": "## System diagram",
+    "stack-summary": "## Stack",
+    "capabilities": "## Capabilities",
+    "flows": "## Flows",
+    "module-map": "## Module map",
+    "cross-cutting-improvements": "## Cross-cutting improvements",
+    "drill-down": "## Drill-down entries",
 }
 
 
