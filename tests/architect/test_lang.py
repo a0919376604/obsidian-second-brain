@@ -115,3 +115,19 @@ def test_heading_map_includes_v4_report_keys():
         assert en in HEADING_MAP, f"missing heading key {en!r}"
         assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
         assert HEADING_MAP[en]["en"] == en
+
+
+def test_heading_map_includes_ai_flow_keys():
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        "## Purpose": "## 流程目的",
+        "## Graph topology": "## 圖結構",
+        "## State schema": "## 狀態 schema",
+        "## Prompts": "## Prompts",
+        "## LLM config": "## LLM 設定",
+        "## Evaluation & observability": "## 評估與觀測",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en

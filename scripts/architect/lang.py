@@ -39,7 +39,7 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Summary": {"en": "## Summary", "zh-TW": "## 摘要"},
     "## Related": {"en": "## Related", "zh-TW": "## 相關"},
     # Overview headings.
-    "## Purpose": {"en": "## Purpose", "zh-TW": "## 用途"},
+    "## Purpose": {"en": "## Purpose", "zh-TW": "## 流程目的"},
     "## Stack": {"en": "## Stack", "zh-TW": "## 技術棧"},
     "## Capability MOC": {"en": "## Capability MOC", "zh-TW": "## 能力地圖 MOC"},
     "## Structure MOC": {"en": "## Structure MOC", "zh-TW": "## 結構地圖 MOC"},
@@ -110,6 +110,15 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Module map": {"en": "## Module map", "zh-TW": "## 模組地圖"},
     "## Cross-cutting improvements": {"en": "## Cross-cutting improvements", "zh-TW": "## 跨模組改進機會"},
     "## Drill-down entries": {"en": "## Drill-down entries", "zh-TW": "## 想深讀的入口"},
+    # v4.1 ai-flow body sections
+    "## Graph topology": {"en": "## Graph topology", "zh-TW": "## 圖結構"},
+    "## State schema": {"en": "## State schema", "zh-TW": "## 狀態 schema"},
+    "## Prompts": {"en": "## Prompts", "zh-TW": "## Prompts"},
+    "## LLM config": {"en": "## LLM config", "zh-TW": "## LLM 設定"},
+    "## Evaluation & observability": {
+        "en": "## Evaluation & observability",
+        "zh-TW": "## 評估與觀測",
+    },
 }
 
 
