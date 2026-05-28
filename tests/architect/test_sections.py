@@ -92,7 +92,7 @@ def test_compose_note_wraps_sentinels(tmp_path: Path):
         signal_sources=["README.md", "src/cli.py"],
         confidence="high",
         output_lang="en",
-        generated_blocks={"summary": "We do X.", "capability-scope": "- alpha\n- beta"},
+        generated_blocks={"summary": "We do X.", "capability-inventory": "- alpha\n- beta"},
     )
     assert note.startswith("---\n")
     assert "type: architecture-features" in note
@@ -101,7 +101,7 @@ def test_compose_note_wraps_sentinels(tmp_path: Path):
     assert "<!-- @generated:start summary -->" in note
     assert "We do X." in note
     assert "<!-- @generated:end summary -->" in note
-    assert "<!-- @generated:start capability-scope -->" in note
+    assert "<!-- @generated:start capability-inventory -->" in note
 
 
 def test_compose_note_zh_tw_uses_translated_headings():
@@ -632,9 +632,9 @@ def test_overview_v4_block_names_are_top_down_report():
 
 
 def test_deprecated_section_types_marked():
-    """v4 marks 6 deprecated SECTION_TYPES entries (still callable for backward compat)."""
+    """v4.2 marks 5 deprecated SECTION_TYPES entries (still callable for backward compat)."""
     from scripts.architect.sections import SECTION_TYPES, DEPRECATED_SECTIONS
-    for s in ("api-surface", "features", "roadmap", "future", "jobs", "flows"):
+    for s in ("api-surface", "roadmap", "future", "jobs", "flows"):
         assert s in SECTION_TYPES, f"{s} still in SECTION_TYPES (kept for backward compat)"
         assert s in DEPRECATED_SECTIONS, f"{s} should be in DEPRECATED_SECTIONS"
 
@@ -781,7 +781,7 @@ def test_compose_note_warns_on_deprecated_section(caplog):
     from scripts.architect.sections import compose_note
     with caplog.at_level(logging.WARNING):
         note = compose_note(
-            section="features",
+            section="api-surface",
             project="x",
             repo_label="local: /tmp/x",
             commit="a",
@@ -791,9 +791,9 @@ def test_compose_note_warns_on_deprecated_section(caplog):
             generated_blocks={"summary": "Test"},
         )
     assert "deprecated" in caplog.text.lower()
-    assert "features" in caplog.text.lower()
+    assert "api-surface" in caplog.text.lower()
     # Note still produced (backward compat).
-    assert "type: architecture-features" in note
+    assert "type: architecture-api-surface" in note
 
 
 def test_compose_decisions_emits_known_limitations_block():

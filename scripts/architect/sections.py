@@ -143,7 +143,19 @@ _PROMPT_LANG_RULES_ZH = (
 # Required @generated block names per section (preamble + body composition).
 _BLOCK_NAMES = {
     "api-surface": ("summary", "interface-overview", "env-overview"),  # DEPRECATED in v4
-    "features": ("summary", "capability-scope", "strengths", "weaknesses", "improvements"),  # DEPRECATED
+    # v4.2 — features as product-PM lens (un-deprecated). 10 blocks.
+    "features": (
+        "summary",
+        "capability-inventory",
+        "product-coverage",
+        "limitations",
+        "strengths",
+        "weaknesses",
+        "missing-features",
+        "improvements",
+        "doc-sync-actions",
+        "dependencies",
+    ),
     "decisions": ("summary", "stack-rationale", "detected-adrs", "pattern-decisions",
                   "commit-message-decisions", "promote-to-adr", "known-limitations"),
     "roadmap": ("summary", "near-term", "trajectory", "todo-clusters", "signals-reviewed"),  # DEPRECATED
@@ -180,10 +192,10 @@ _BLOCK_NAMES = {
 }
 
 # v4 — these sections are still callable for backward compat but no longer
-# emitted by the default `--frame=report` pipeline. The v3 vault migration
-# deletes their vault files; the schema entries stay so old vaults still load.
+# emitted by the default `--frame=report` pipeline. v4.2 re-introduces
+# `features` as a product-PM lens (see _BLOCK_NAMES["features"] below).
 DEPRECATED_SECTIONS = frozenset({
-    "api-surface", "features", "roadmap", "future", "jobs", "flows",
+    "api-surface", "roadmap", "future", "jobs", "flows",
 })
 
 # Canonical English H2 heading per @generated block name. Translated at render
@@ -228,6 +240,12 @@ _BLOCK_HEADINGS = {
     "module-map": "## Module map",
     "cross-cutting-improvements": "## Cross-cutting improvements",
     "drill-down": "## Drill-down entries",
+    # v4.2 features block headings
+    "capability-inventory": "## Capability inventory",
+    "product-coverage": "## Product coverage",
+    "limitations": "## Limitations",
+    "missing-features": "## Missing features",
+    "doc-sync-actions": "## Doc sync actions",
     # v4.1 ai-flow report sections
     "ai-purpose": "## Purpose",
     "graph-topology": "## Graph topology",
@@ -352,7 +370,7 @@ def _preamble_for(section: str, lang: str) -> str:
     if lang == "zh-TW":
         return {
             "api-surface": "本檔是 API 介面參考表。要查命令或 endpoint 就看這裡。",
-            "features": "本檔列出本 codebase 對使用者提供的能力。具體 CLI/HTTP 表在 [[Architecture/api-surface]],模組層級在 [[Architecture/modules]]。",
+            "features": "本檔是 product PM 視角:看完整 feature set,標 online/deprecated,從產品角度討論優缺、缺什麼、該補哪些 doc。技術視角請見 [[Architecture/modules]]/[[Architecture/ai-flows]];使用者型態請見 [[Architecture/personas]]。",
             "decisions": "本檔是關鍵技術決定的索引;真正的 ADR 應該透過 /obsidian-adr 升級到 Decisions/。",
             "roadmap": "本檔合成自 CHANGELOG、README、TODO 群組。標明來源,推論值低信心。",
             "future": "本檔是 gap 分析與北極星想法。多為推論,非已決方向。",
@@ -364,7 +382,7 @@ def _preamble_for(section: str, lang: str) -> str:
         }[section]
     return {
         "api-surface": "This is the API surface reference. Look up commands or endpoints here.",
-        "features": "Capabilities exposed by this codebase. See [[Architecture/api-surface]] for the structured tables and [[Architecture/modules]] for per-module depth.",
+        "features": "Product-PM lens. Capability inventory with online/deprecated status (deterministic from git+api_surface), product-level strengths/weaknesses/limitations, gap analysis from vault Research/, and doc-sync action todos. For technical depth see [[Architecture/modules]]/[[Architecture/ai-flows]]; user types see [[Architecture/personas]].",
         "decisions": "Index of key technical decisions. Promote individual entries to full ADRs via /obsidian-adr into Decisions/.",
         "roadmap": "Synthesized from CHANGELOG, README, and TODO clusters. Inference is marked.",
         "future": "Gap analysis and north-star ideas. Mostly inferred, not committed.",
