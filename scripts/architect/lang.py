@@ -119,6 +119,15 @@ HEADING_MAP: dict[str, dict[str, str]] = {
         "en": "## Evaluation & observability",
         "zh-TW": "## 評估與觀測",
     },
+    # v4.2 features.md (product-PM lens)
+    "## Capability inventory": {"en": "## Capability inventory", "zh-TW": "## 能力清單"},
+    "## Product coverage": {"en": "## Product coverage", "zh-TW": "## 產品覆蓋度"},
+    "## Limitations": {"en": "## Limitations", "zh-TW": "## 產品邊界"},
+    "## Missing features": {
+        "en": "## Missing features",
+        "zh-TW": "## 可加 features (gap analysis)",
+    },
+    "## Doc sync actions": {"en": "## Doc sync actions", "zh-TW": "## 文件補補丁"},
 }
 
 

@@ -117,6 +117,22 @@ def test_heading_map_includes_v4_report_keys():
         assert HEADING_MAP[en]["en"] == en
 
 
+def test_heading_map_includes_v4_2_features_keys():
+    """v4.2 features.md introduces 5 new H2 headings (product-PM lens)."""
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        "## Capability inventory": "## 能力清單",
+        "## Product coverage": "## 產品覆蓋度",
+        "## Limitations": "## 產品邊界",
+        "## Missing features": "## 可加 features (gap analysis)",
+        "## Doc sync actions": "## 文件補補丁",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en
+
+
 def test_heading_map_includes_ai_flow_keys():
     from scripts.architect.lang import HEADING_MAP
     required = {

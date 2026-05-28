@@ -93,3 +93,68 @@ def test_excludes_venv_node_modules_dist_etc(tmp_path: Path):
     names = [e.symbol for e in surf.exports]
     assert "from_venv" not in names
     assert "from_cache" not in names
+
+
+def test_fastapi_apirouter_prefix_prepended(tmp_path: Path):
+    """When APIRouter is declared with prefix=, decorator paths are joined.
+
+    Repro from langlive-line-oa: workspace.py has
+        router = APIRouter(prefix="/api/v1/workspace")
+        @router.post("/reply-images")
+    The full mounted path is /api/v1/workspace/reply-images — scanner must
+    capture that, not the bare /reply-images.
+    """
+    (tmp_path / "ws.py").write_text(
+        "from fastapi import APIRouter\n"
+        'router = APIRouter(prefix="/api/v1/workspace", tags=["workspace"])\n'
+        "\n"
+        "@router.post('/reply-images')\n"
+        "def reply_images(): ...\n"
+        "\n"
+        "@router.get('/users/{user_id}/tickets')\n"
+        "def tickets(): ...\n"
+    )
+    from scripts.architect.api_surface import detect_api_surface
+
+    surf = detect_api_surface(tmp_path)
+    paths = [r.path for r in surf.http_routes]
+    assert "/api/v1/workspace/reply-images" in paths, (
+        f"router prefix not joined; got {paths}"
+    )
+    assert "/api/v1/workspace/users/{user_id}/tickets" in paths
+
+
+def test_fastapi_apirouter_no_prefix_passes_through(tmp_path: Path):
+    """When APIRouter has no prefix kwarg, decorator paths stay verbatim."""
+    (tmp_path / "ws.py").write_text(
+        "from fastapi import APIRouter\n"
+        'router = APIRouter(tags=["misc"])\n'
+        "\n"
+        "@router.get('/health')\n"
+        "def health(): ...\n"
+    )
+    from scripts.architect.api_surface import detect_api_surface
+
+    surf = detect_api_surface(tmp_path)
+    paths = [r.path for r in surf.http_routes]
+    assert "/health" in paths
+
+
+def test_fastapi_app_decorator_no_prefix_lookup(tmp_path: Path):
+    """`@app.get(...)` decorators don't go through APIRouter prefix lookup.
+
+    Some files use the bare FastAPI app instance (`app = FastAPI()`) directly.
+    Those routes should be captured verbatim with no spurious prefix join.
+    """
+    (tmp_path / "main.py").write_text(
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "\n"
+        "@app.get('/health')\n"
+        "def health(): ...\n"
+    )
+    from scripts.architect.api_surface import detect_api_surface
+
+    surf = detect_api_surface(tmp_path)
+    paths = [r.path for r in surf.http_routes]
+    assert "/health" in paths

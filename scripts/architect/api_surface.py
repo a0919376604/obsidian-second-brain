@@ -126,19 +126,33 @@ def _detect_argparse(text: str, rel: str) -> list[CliCommand]:
 
 
 _FASTAPI_RE = re.compile(
-    r"@\w+\.(?P<method>get|post|put|patch|delete)\(\s*['\"](?P<path>[^'\"]+)['\"]"
+    r"@(?P<var>\w+)\.(?P<method>get|post|put|patch|delete)\(\s*['\"](?P<path>[^'\"]+)['\"]"
     r"[^)]*\)\s*\n\s*(?:async\s+)?def\s+(?P<handler>\w+)",
     re.IGNORECASE,
 )
 
+# `<var> = APIRouter(... prefix="..." ...)` — captures the variable name + its
+# declared prefix so per-file decorator paths can be joined into the full
+# mounted path (matches FastAPI's actual routing behavior).
+_APIROUTER_RE = re.compile(
+    r"(?P<var>\w+)\s*=\s*APIRouter\([^)]*prefix\s*=\s*['\"](?P<prefix>[^'\"]+)['\"]"
+)
+
 
 def _detect_fastapi(text: str, rel: str) -> list[HttpRoute]:
+    # Build (var → prefix) map from in-file APIRouter declarations.
+    prefix_map: dict[str, str] = {}
+    for m in _APIROUTER_RE.finditer(text):
+        prefix_map[m.group("var")] = m.group("prefix")
+
     out: list[HttpRoute] = []
     for m in _FASTAPI_RE.finditer(text):
         line = text[: m.start()].count("\n") + 1
+        prefix = prefix_map.get(m.group("var"), "")
+        full_path = prefix + m.group("path")
         out.append(HttpRoute(
             method=m.group("method").upper(),
-            path=m.group("path"),
+            path=full_path,
             handler=m.group("handler"),
             source=f"{rel}:{line}",
         ))
