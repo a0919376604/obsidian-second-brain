@@ -31,6 +31,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("repo_path", help="Path to the git repo to scan")
     parser.add_argument("--out", help="Directory to write _manifest.yml and scan-report.json", default=None)
     parser.add_argument("--dry-run", action="store_true", help="Print to stdout, do not write files")
+    parser.add_argument(
+        "--vault-project-dir",
+        type=Path,
+        default=None,
+        help="Vault project hub dir for research walking (v4.2 features)",
+    )
     args = parser.parse_args(argv)
 
     repo = Path(args.repo_path).resolve()
@@ -41,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {repo} is not a git repo", file=sys.stderr)
         return 2
 
-    result = run_phase_one(repo)
+    result = run_phase_one(repo, vault_project_dir=args.vault_project_dir)
 
     payload = {
         "manifest": asdict(result.manifest),

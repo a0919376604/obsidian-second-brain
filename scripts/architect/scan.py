@@ -4,6 +4,7 @@ plus narrative-signal detectors into a single deterministic output.
 
 from __future__ import annotations
 
+import subprocess
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
@@ -15,10 +16,12 @@ from scripts.architect.changelog import load_changelog
 from scripts.architect.commit_decisions import extract_commit_decisions
 from scripts.architect.deps import detect_external_deps
 from scripts.architect.entry_points import detect_entry_points
+from scripts.architect.git_history import last_touch_map
 from scripts.architect.manifest import Manifest
 from scripts.architect.prompt_extract import extract_prompts
 from scripts.architect.proposal import propose_modules_with_heuristics
 from scripts.architect.readme import extract_from_repo
+from scripts.architect.research_walker import collect_research_excerpts
 from scripts.architect.repomix import pack_repo_metadata
 from scripts.architect.stack import detect_stack
 from scripts.architect.todos import aggregate_todos
@@ -33,12 +36,12 @@ class ScanResult:
     scan_report: dict
 
 
-def run_phase_one(repo_root: Path) -> ScanResult:
+def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> ScanResult:
     repo_root = repo_root.resolve()
 
     files = walk_repo(repo_root)
     languages = language_stats(repo_root)
-    git_meta = git_metadata(repo_root)
+    git_meta = _git_metadata_or_unknown(repo_root)
     entry_points = detect_entry_points(repo_root)
     external_deps = detect_external_deps(repo_root)
     modules = propose_modules_with_heuristics(repo_root, entry_points=entry_points)
@@ -115,8 +118,78 @@ def run_phase_one(repo_root: Path) -> ScanResult:
         "commit_decisions": commit_decisions,
         "ai_flows": ai_flows_data,
     }
+    _add_features_inputs(scan_report, repo_root, vault_project_dir)
 
     return ScanResult(manifest=manifest, scan_report=scan_report)
+
+
+def build_scan_report(repo_root: Path, vault_project_dir: Path | None = None) -> dict:
+    """Build and return only the scan-report dict.
+
+    This is a thin v4.2 convenience wrapper for tests and command snippets that
+    do not need the manifest object.
+    """
+    return run_phase_one(repo_root, vault_project_dir=vault_project_dir).scan_report
+
+
+def _git_metadata_or_unknown(repo_root: Path) -> dict:
+    """Return git metadata, or a stable placeholder for non-git test fixtures."""
+    try:
+        return git_metadata(repo_root)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {"commit": "unknown", "dirty": False}
+
+
+def _add_features_inputs(
+    report: dict,
+    repo_root: Path,
+    vault_project_dir: Path | None,
+) -> None:
+    """Add v4.2 features.md inputs to `report` in place."""
+    agents_path = repo_root / "AGENTS.md"
+    agents_text = ""
+    if agents_path.exists():
+        try:
+            agents_text = agents_path.read_text(encoding="utf-8")[:20_000]
+        except (OSError, UnicodeDecodeError):
+            agents_text = ""
+    report["agents_md_text"] = agents_text
+
+    if vault_project_dir is not None and Path(vault_project_dir).exists():
+        report["research_excerpts"] = collect_research_excerpts(Path(vault_project_dir))
+    else:
+        report["research_excerpts"] = []
+
+    surface = report.get("api_surface", {}) or {}
+    surface_files: set[str] = set()
+    for route in surface.get("http_routes", []):
+        f = _surface_file(route)
+        if f:
+            surface_files.add(f)
+    for cmd in surface.get("cli_commands", []):
+        f = _surface_file(cmd)
+        if f:
+            surface_files.add(f)
+    for exp in surface.get("exports", []):
+        f = _surface_file(exp)
+        if f:
+            surface_files.add(f)
+    if not surface_files:
+        surface_files = {
+            f for f in report.get("files", []) if Path(f).suffix.lower() in {".py", ".js", ".ts", ".tsx"}
+        }
+    report["git_last_touch"] = last_touch_map(repo_root, sorted(surface_files))
+
+
+def _surface_file(entry: dict) -> str:
+    """Return file path from api_surface entry with either `file` or `source` shape."""
+    file_value = entry.get("file")
+    if file_value:
+        return file_value
+    source = entry.get("source") or ""
+    if ":" not in source:
+        return source
+    return source.rsplit(":", 1)[0]
 
 
 def _changelog_to_dict(cl) -> dict:
