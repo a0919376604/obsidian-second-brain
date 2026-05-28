@@ -91,7 +91,25 @@ def test_heading_map_includes_v3_judgment_keys():
         "## Journey": "## 旅程",
         "## Personas": "## 使用者型態",
         "## Jobs to be done": "## Jobs to be Done",
-        "## Flows": "## 使用流程",
+        "## Flows": "## 核心使用流程",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en
+
+
+def test_heading_map_includes_v4_report_keys():
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        "## Purpose & audience": "## 這是什麼 / 為誰服務",
+        "## System diagram": "## 系統架構圖",
+        "## Capabilities": "## 核心能力",
+        "## Flows": "## 核心使用流程",
+        "## Module map": "## 模組地圖",
+        "## Cross-cutting improvements": "## 跨模組改進機會",
+        "## Drill-down entries": "## 想深讀的入口",
+        "## Known limitations": "## 已知限制",
     }
     for en, zh in required.items():
         assert en in HEADING_MAP, f"missing heading key {en!r}"

@@ -99,10 +99,17 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Journey": {"en": "## Journey", "zh-TW": "## 旅程"},
     "## Personas": {"en": "## Personas", "zh-TW": "## 使用者型態"},
     "## Jobs to be done": {"en": "## Jobs to be done", "zh-TW": "## Jobs to be Done"},
-    "## Flows": {"en": "## Flows", "zh-TW": "## 使用流程"},
+    "## Flows": {"en": "## Flows", "zh-TW": "## 核心使用流程"},
     "## Dependencies and consumers": {"en": "## Dependencies and consumers", "zh-TW": "## 相依與被誰使用"},
     "## Interface overview": {"en": "## Interface overview", "zh-TW": "## 介面類型概觀"},
     "## Environment variables overview": {"en": "## Environment variables overview", "zh-TW": "## 環境變數概觀"},
+    # v4 consolidated-report frame (overview top-down sections)
+    "## Purpose & audience": {"en": "## Purpose & audience", "zh-TW": "## 這是什麼 / 為誰服務"},
+    "## System diagram": {"en": "## System diagram", "zh-TW": "## 系統架構圖"},
+    "## Capabilities": {"en": "## Capabilities", "zh-TW": "## 核心能力"},
+    "## Module map": {"en": "## Module map", "zh-TW": "## 模組地圖"},
+    "## Cross-cutting improvements": {"en": "## Cross-cutting improvements", "zh-TW": "## 跨模組改進機會"},
+    "## Drill-down entries": {"en": "## Drill-down entries", "zh-TW": "## 想深讀的入口"},
 }
 
 
