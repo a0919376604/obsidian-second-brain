@@ -47,6 +47,7 @@ SECTION_TYPES = {
     "personas": "architecture-personas",
     "jobs": "architecture-jobs",
     "flows": "architecture-flows",
+    "ai-flow": "architecture-ai-flow",
 }
 
 
@@ -164,6 +165,18 @@ _BLOCK_NAMES = {
     "personas": ("summary", "personas-list"),
     "jobs": ("summary", "jobs-list"),  # DEPRECATED
     "flows": ("summary", "flows-list"),  # DEPRECATED
+    "ai-flow": (
+        "ai-purpose",
+        "graph-topology",
+        "state-schema",
+        "prompts",
+        "llm-config",
+        "evaluation",
+        "strengths",
+        "weaknesses",
+        "improvements",
+        "dependencies",
+    ),
 }
 
 # v4 — these sections are still callable for backward compat but no longer
@@ -215,6 +228,13 @@ _BLOCK_HEADINGS = {
     "module-map": "## Module map",
     "cross-cutting-improvements": "## Cross-cutting improvements",
     "drill-down": "## Drill-down entries",
+    # v4.1 ai-flow report sections
+    "ai-purpose": "## Purpose",
+    "graph-topology": "## Graph topology",
+    "state-schema": "## State schema",
+    "prompts": "## Prompts",
+    "llm-config": "## LLM config",
+    "evaluation": "## Evaluation & observability",
 }
 
 
@@ -340,6 +360,7 @@ def _preamble_for(section: str, lang: str) -> str:
             "personas": "本檔列出推測的使用者/開發者角色,基於 surface area 與功能。多為推論。",
             "jobs": "本檔列出 codebase 為使用者完成的工作 (jobs to be done)。",
             "flows": "本檔列出橫跨模組的關鍵使用者流程或資料流。",
+            "ai-flow": "本檔是單一 AI 流程的深判斷 — 包含 graph 結構、state schema、prompts 全文、LLM 設定、評估與設計優缺點。",
         }[section]
     return {
         "api-surface": "This is the API surface reference. Look up commands or endpoints here.",
@@ -351,6 +372,7 @@ def _preamble_for(section: str, lang: str) -> str:
         "personas": "Inferred user/developer personas from surface area and features. Mostly speculation.",
         "jobs": "Jobs to be done that this codebase fulfills for users.",
         "flows": "Cross-module user flows or data flows of note.",
+        "ai-flow": "Deep judgment for a single AI flow — graph topology, state schema, full prompts, LLM config, evaluation, and design pros/cons.",
     }[section]
 
 

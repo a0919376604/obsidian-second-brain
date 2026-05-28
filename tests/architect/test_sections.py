@@ -366,6 +366,25 @@ def test_compose_overview_en_emits_report():
     assert "[[decisions]]" in note
 
 
+def test_ai_flow_section_type_registered():
+    from scripts.architect.sections import SECTION_TYPES, _BLOCK_NAMES, _BLOCK_HEADINGS
+    assert SECTION_TYPES.get("ai-flow") == "architecture-ai-flow"
+    expected = ("ai-purpose", "graph-topology", "state-schema", "prompts",
+                "llm-config", "evaluation", "strengths", "weaknesses",
+                "improvements", "dependencies")
+    assert _BLOCK_NAMES["ai-flow"] == expected
+    for block in ("ai-purpose", "graph-topology", "state-schema", "prompts", "llm-config", "evaluation"):
+        assert block in _BLOCK_HEADINGS, f"missing heading mapping for block {block}"
+
+
+def test_ai_flow_preamble_en_and_zh():
+    from scripts.architect.sections import _preamble_for
+    en_text = _preamble_for("ai-flow", "en")
+    zh_text = _preamble_for("ai-flow", "zh-TW")
+    assert "ai" in en_text.lower() or "llm" in en_text.lower()
+    assert "AI" in zh_text or "LLM" in zh_text or "Prompts" in zh_text
+
+
 def test_compose_overview_zh_tw_translates_and_omits_empty_stack():
     from scripts.architect.sections import compose_overview
     note = compose_overview(
