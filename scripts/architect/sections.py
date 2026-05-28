@@ -771,6 +771,20 @@ def build_overview_prompt(
     ])
 
 
+SUPPORTED_FRAMES = ("report", "judgment", "description")
+DEFAULT_FRAME = "report"
+
+
+def resolve_frame(cli_flag: str | None) -> str:
+    """Return the effective architect frame.
+
+    Precedence: CLI flag > default ('report'). Invalid or empty falls back.
+    """
+    if cli_flag and cli_flag in SUPPORTED_FRAMES:
+        return cli_flag
+    return DEFAULT_FRAME
+
+
 def build_module_prompt(
     *,
     module_slug: str,

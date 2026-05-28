@@ -796,3 +796,17 @@ def test_compose_decisions_emits_known_limitations_block():
     assert "## 已知限制" in note
     assert "@generated:start known-limitations" in note
     assert "backend/.env deprecated" in note
+
+
+def test_resolve_frame_default_is_report():
+    from scripts.architect.sections import resolve_frame
+    assert resolve_frame(None) == "report"
+    assert resolve_frame("report") == "report"
+    assert resolve_frame("judgment") == "judgment"
+    assert resolve_frame("description") == "description"
+
+
+def test_resolve_frame_invalid_falls_back_to_report():
+    from scripts.architect.sections import resolve_frame
+    assert resolve_frame("vibe-driven") == "report"
+    assert resolve_frame("") == "report"
