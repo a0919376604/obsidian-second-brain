@@ -1,34 +1,41 @@
 # obsidian-architect v4.1 (AI Flows Layer) Implementation Plan
 
-## Blocker
+## Resolution log
 
-Task 13 commit staging step did not match the expected output. The exact command
-`git add commands/obsidian-architect.md dist/` returned:
+**Tasks 13 / 14 staging:** `dist/` is gitignored and had no tracked changes
+during the run, so `git add ... dist/` correctly produced an advisory warning
+but staged the other listed files. Both commits landed; nothing actually
+broken. Plan steps should drop `dist/` from the staging command in future
+revisions.
 
-```text
-The following paths are ignored by one of your .gitignore files:
-dist
-hint: Use -f if you really want to add them.
-hint: Disable this message with "git config set advice.addIgnoredFile false"
-```
+**Task 15 detector mismatch (resolved 2026-05-28):** Initial smoke detected 3
+flows instead of 2 because:
 
-`commands/obsidian-architect.md` was staged before Git reported the ignored
-`dist/` path. The adapter build itself succeeded, and `dist/` had no tracked
-changes in `git status --short`.
+1. Parent candidate `backend/engines` matched `_AI_DIR_NAMES` and duplicated
+   the nested `backend/engines/langgraph` flow.
+2. `modules/qa_to_kb` was classified as `langgraph` because the repo-level
+   pyproject lists `langgraph` (used by the OTHER subsystem), even though
+   the module's own code only imports `openai` + `langchain_core` utility
+   types and uses a custom pipeline.py + nodes/ + prompts.toml structure.
 
-Task 14 commit staging hit the same ignored-path issue. The exact command
-`git add CHANGELOG.md SKILL.md README.md dist/` returned:
+**Fixes (committed after Task 15):**
 
-```text
-The following paths are ignored by one of your .gitignore files:
-dist
-hint: Use -f if you really want to add them.
-hint: Disable this message with "git config set advice.addIgnoredFile false"
-```
-
-`CHANGELOG.md`, `README.md`, `SKILL.md`, and the tracked
-`dist/claude-code/SKILL.md` build output were staged before Git reported the
-ignored `dist/` path.
+- `detect_ai_flows` now post-filters via `_drop_ancestor_duplicates`: any flow
+  whose `root_path` is a strict ancestor of another flow's `root_path` is
+  dropped (the more specific nested flow wins).
+- `_classify_candidate` reordered so LOCAL evidence beats repo-level deps,
+  and structural custom-pipeline signal (pipeline.py + nodes/ + prompts +
+  LLM lib) beats utility-only LangChain imports (`from langchain_core...`).
+  Order: langgraph-import > custom-pipeline-structural > langchain-import >
+  langgraph-dep > langchain-dep.
+- Three new tests in `tests/architect/test_ai_flow.py` lock in the new
+  ordering (`test_parent_candidate_dropped_when_nested_flow_exists`,
+  `test_langchain_utility_imports_do_not_force_langchain_framework`,
+  `test_local_evidence_wins_over_repo_dep`).
+- Re-ran the langlive-line-oa smoke after the fix: detected 2 flows,
+  `backend/engines/langgraph` → langgraph (confidence stated),
+  `modules/qa_to_kb` → custom-pipeline (confidence medium). Matches Task 15
+  acceptance criteria.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
