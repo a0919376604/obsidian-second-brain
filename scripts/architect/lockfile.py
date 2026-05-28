@@ -9,6 +9,7 @@ Schema versions:
   v2: adds `sections` (per-section narrative notes) and `functions`
       (optional --functions=public layer). Loading v1 silently migrates.
   v3: adds `frame` marker (`description-v2` legacy vs `judgment-v3`).
+  v4: default frame is `report-v4`; old frames are preserved on load.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-CURRENT_SCHEMA = 3
+CURRENT_SCHEMA = 4
 
 
 @dataclass
@@ -42,6 +43,16 @@ def load_lockfile(path: Path) -> Lockfile | None:
         return None
     data = json.loads(path.read_text())
     incoming_version = data.get("version", 1)
+    # Frame default based on which version produced the file.
+    # Lets the v3->v4 migration step (later) detect and rewrite frame after upgrading content.
+    if "frame" in data:
+        frame = data["frame"]
+    elif incoming_version >= 4:
+        frame = "report-v4"
+    elif incoming_version == 3:
+        frame = "judgment-v3"
+    else:
+        frame = "description-v2"
     return Lockfile(
         version=CURRENT_SCHEMA,
         scanner_version=data.get("scanner_version", "0.0.0"),
@@ -49,7 +60,7 @@ def load_lockfile(path: Path) -> Lockfile | None:
         note_blocks=data.get("note_blocks", {}),
         sections=data.get("sections", {}),
         functions=data.get("functions", {}),
-        frame=data.get("frame", "description-v2" if incoming_version < 3 else "judgment-v3"),
+        frame=frame,
     )
 
 
