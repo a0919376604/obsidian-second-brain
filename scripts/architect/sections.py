@@ -807,6 +807,150 @@ def resolve_frame(cli_flag: str | None) -> str:
     return DEFAULT_FRAME
 
 
+def build_ai_flow_prompt(
+    *,
+    flow_slug: str,
+    flow_name: str,
+    framework: str,
+    flow_kind: str,
+    prompts_inventory: list[dict],
+    state_module: str | None,
+    graph_files: list[str],
+    repomix_packed: str,
+    output_lang: str,
+) -> str:
+    """v4.1 — AI flow synthesis prompt.
+
+    Demands the LLM produce 10 @generated block bodies. Prompts block is special:
+    must wrap each prompt body in a collapsible Obsidian callout AND keep
+    sentinel structure. Dynamic prompts get a description, NOT a synthesized body.
+    """
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫所有散文與 heading。"
+            "Code identifier (檔名、function/class、state key 名、env var)、"
+            "prompt 全文、Mermaid 圖內 node ID 保持英文/原文。"
+        )
+    else:
+        lang_directive = (
+            "Write all prose in English. Code identifiers, prompt text, and "
+            "Mermaid node IDs stay verbatim."
+        )
+
+    # Inventory summary for the prompt (the agent fills in full bodies in block 4).
+    prompts_summary_lines = []
+    for p in prompts_inventory:
+        marker = "(DYNAMIC — describe assembly, do NOT synthesize body)" if p.get("is_dynamic") else ""
+        prompts_summary_lines.append(
+            f"  - name={p['name']}  source={p['source']}  "
+            f"is_dynamic={p.get('is_dynamic', False)} {marker}"
+        )
+        if not p.get("is_dynamic"):
+            preview = p.get("body", "")[:200]
+            prompts_summary_lines.append(f"    body preview: {preview!r}")
+    prompts_summary = "\n".join(prompts_summary_lines) if prompts_summary_lines else (
+        "  (no static prompts extracted)"
+    )
+
+    return "\n".join([
+        f"You are documenting the AI flow `{flow_slug}` ({flow_name}).",
+        f"Framework: {framework}.  Flow kind: {flow_kind}.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. DO NOT invent prompt body text. For each static prompt extracted (see "
+        "   inventory below), use its body VERBATIM inside the rendered block. "
+        "   For DYNAMIC prompts, write a description of how it is assembled "
+        "   (which source files contribute), and DO NOT synthesize a body.",
+        "2. Every improvement must cite Evidence — wikilinks to [[modules/<slug>]]"
+        " or `path:line`. Drop any Imp you cannot ground in Evidence.",
+        "3. Strengths and weaknesses follow the v3.1 tight bullet shape: "
+        "**Title (≤ 30 chars).** 1 line clarification (≤ 80 chars).",
+        "",
+        "## Output: produce 10 @generated blocks (JSON keys)",
+        "",
+        "### `ai-purpose`",
+        "1 paragraph: when this AI runs, for whom, what it solves, what it outputs.",
+        "",
+        "### `graph-topology`",
+        "ONE Mermaid `graph TD` showing nodes + edges + conditional routing. "
+        "Each node label includes its source `path:line`.",
+        "",
+        "### `state-schema`",
+        "If a State TypedDict / pydantic model exists (see "
+        f"{state_module or '(none found)'}), copy its Python form into a "
+        "```python``` block.  If dynamic / dict-only, describe the keys you "
+        "see referenced.",
+        "",
+        "### `prompts`",
+        "For EACH prompt in the inventory below, render ONE H3 + 4 metadata bullets +",
+        "ONE collapsible callout wrapping the body, inside a per-prompt @generated sentinel.",
+        "Format STRICTLY:",
+        "  ```",
+        "  ### <prompt name>",
+        "  - **用途 / Purpose:** <1 句>",
+        "  - **Source:** `<path:line-range>`",
+        "  - **Model:** <model_hint or unknown>",
+        "  - **Type:** static template  OR  dynamic — see assembly notes",
+        "",
+        "  <!-- @generated:start prompt-<slug> -->",
+        "  > [!quote]- 完整 prompt",
+        "  > ````",
+        "  > <full body verbatim from inventory, OR dynamic description>",
+        "  > ````",
+        "  <!-- @generated:end prompt-<slug> -->",
+        "  ```",
+        "Where `prompt-<slug>` uses ascii-lowercase-hyphen of the prompt name.",
+        "Do NOT modify the prompt body — copy from inventory below verbatim.",
+        "",
+        "### `llm-config`",
+        "Markdown table: | Role | Model | Temperature | Fallback | Latency budget |",
+        "Pull values from the inventory's `model_hint` + any visible `model=...` / "
+        "`temperature=...` in graph files.  Mark unknowns as `?`.",
+        "",
+        "### `evaluation`",
+        "Does owner have eval framework? metrics? tracing (LangSmith/Helicone/Phoenix)? "
+        "If absent → `> [!warning] 無 eval framework — 評估完全靠人工 / 客訴.` (zh-TW)",
+        "",
+        "### `strengths`",
+        "3-5 tight bullets each with Evidence.",
+        "",
+        "### `weaknesses`",
+        "3-5 tight bullets each with concrete impact. Include AI-specific failure "
+        "modes (hallucination / cost / latency / rate-limit / prompt-injection).",
+        "",
+        "### `improvements`",
+        "2-4 Imps. Each MUST contain:",
+        "  - **為什麼 / Why:** <≤ 1 sentence>",
+        "  - **證據 / Evidence:** wikilink or `path:line`",
+        "  - **Effort:** S | M | L | XL",
+        "  - **未做的風險 / Risk if not done:** <≤ 1 sentence>",
+        "  - **Confidence:** stated | high | medium | speculation",
+        "",
+        "### `dependencies`",
+        "Wikilinks only:",
+        "  - Host module:  `[[modules/<host>]]`",
+        "  - External APIs:  Gemini / OpenAI / Anthropic / ...",
+        "  - Framework:  LangGraph / LangChain (link to decision if exists)",
+        "  - Observability:  LangSmith / Phoenix (if stated)",
+        "",
+        "Return strict JSON: {\"ai-purpose\": \"...\", \"graph-topology\": \"...\", "
+        "\"state-schema\": \"...\", \"prompts\": \"...\", \"llm-config\": \"...\", "
+        "\"evaluation\": \"...\", \"strengths\": \"...\", \"weaknesses\": \"...\", "
+        "\"improvements\": \"...\", \"dependencies\": \"...\"}.",
+        "",
+        "## Prompts inventory (use these bodies verbatim)",
+        prompts_summary,
+        "",
+        "## Graph files",
+        ", ".join(graph_files) if graph_files else "(none detected)",
+        "",
+        "## Repomix-packed module context",
+        repomix_packed[:50000],
+    ])
+
+
 def build_module_prompt(
     *,
     module_slug: str,

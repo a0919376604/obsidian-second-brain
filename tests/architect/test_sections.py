@@ -829,3 +829,49 @@ def test_resolve_frame_invalid_falls_back_to_report():
     from scripts.architect.sections import resolve_frame
     assert resolve_frame("vibe-driven") == "report"
     assert resolve_frame("") == "report"
+
+
+def test_build_ai_flow_prompt_demands_required_blocks():
+    from scripts.architect.sections import build_ai_flow_prompt
+    prompt = build_ai_flow_prompt(
+        flow_slug="lang-ai-customer",
+        flow_name="LangAI Customer Chat",
+        framework="langgraph",
+        flow_kind="real-time-chat",
+        prompts_inventory=[
+            {"name": "intent_classifier", "source": "backend/engines/langgraph/prompts/intent.py:1-25",
+             "body": "You are an intent classifier...\n", "is_dynamic": False, "source_hash": "sha256:abc"},
+        ],
+        state_module="backend/engines/langgraph/core/state.py",
+        graph_files=["backend/engines/langgraph/graph.py"],
+        repomix_packed="(repomix packed content)",
+        output_lang="zh-TW",
+    )
+    assert "lang-ai-customer" in prompt
+    assert "langgraph" in prompt
+    # Demands 10 block keys
+    for block in ("ai-purpose", "graph-topology", "state-schema", "prompts",
+                  "llm-config", "evaluation", "strengths", "weaknesses",
+                  "improvements", "dependencies"):
+        assert block in prompt, f"prompt should mention block {block}"
+    # Prompts section instructions
+    assert "collapsible" in prompt.lower() or "callout" in prompt.lower()
+    assert "[!quote]" in prompt  # Obsidian callout syntax mentioned
+    # Forbid full prompt body invention for dynamic prompts
+    assert "dynamic" in prompt.lower()
+    # zh-TW directive
+    assert "繁體中文" in prompt or "zh-TW" in prompt
+    # Imp 5-field
+    for field in ("Why", "Evidence", "Effort", "Risk", "Confidence"):
+        assert field in prompt
+
+
+def test_build_ai_flow_prompt_en_no_chinese():
+    from scripts.architect.sections import build_ai_flow_prompt
+    prompt = build_ai_flow_prompt(
+        flow_slug="x", flow_name="X", framework="langgraph", flow_kind="real-time-chat",
+        prompts_inventory=[], state_module=None, graph_files=[],
+        repomix_packed="", output_lang="en",
+    )
+    assert "繁體中文" not in prompt
+    assert "English" in prompt or "en" in prompt
