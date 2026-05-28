@@ -236,3 +236,41 @@ def test_v4_detect_candidates_reads_known_limitations_in_decisions(tmp_path):
     assert "limitation" in kinds
     titles = [c.title for c in cands if c.kind == "limitation"]
     assert any("env deprecated" in t for t in titles)
+
+
+def test_v4_1_detect_candidates_reads_ai_flows_dir(tmp_path):
+    """v4.1: detect_candidates also walks Architecture/ai-flows/*.md."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "ai-flows").mkdir(parents=True)
+    (arch / "ai-flows" / "lang-ai-customer.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 1: 加 prompt eval framework\n"
+        "- **為什麼:** 完全靠人工\n"
+        "- **證據:** `backend/engines/langgraph/`\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** prompt regression 無法 catch\n"
+        "- **Confidence:** stated\n"
+    )
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    assert any("prompt eval framework" in t for t in titles), \
+        f"ai-flow Imp not picked up by detect_candidates; got: {titles}"
+    imp = next(c for c in cands if "prompt eval" in c.title)
+    assert imp.effort == "L"
+    assert imp.confidence == "stated"
+
+
+def test_v4_1_detect_candidates_no_ai_flows_dir_still_works(tmp_path):
+    """If ai-flows/ doesn't exist, detect_candidates falls through cleanly."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "modules").mkdir(parents=True)
+    (arch / "modules" / "backend.md").write_text(
+        "## 改進機會\n\n"
+        "### Imp 1: backend Imp\n"
+        "- **為什麼:** ...\n- **證據:** [[x]]\n- **Effort:** S\n"
+        "- **未做的風險:** ...\n- **Confidence:** high\n"
+    )
+    cands = detect_candidates(tmp_path)
+    assert any("backend Imp" in c.title for c in cands)

@@ -71,6 +71,9 @@ def detect_candidates(project_root: Path) -> list[Candidate]:
         candidate_files.append(arch / "decisions.md")
     if (arch / "modules").is_dir():
         candidate_files.extend(sorted((arch / "modules").glob("*.md")))
+    # v4.1: AI flow improvements feed roadmap signal.
+    if (arch / "ai-flows").is_dir():
+        candidate_files.extend(sorted((arch / "ai-flows").glob("*.md")))
 
     for f in candidate_files:
         out.extend(_extract_improvements_from_file(f, arch))
