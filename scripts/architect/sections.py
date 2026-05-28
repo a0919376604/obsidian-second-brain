@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 from scripts.architect.lang import heading
+
+_logger = logging.getLogger(__name__)
 
 SECTION_NAMES = ("api-surface", "features", "decisions", "roadmap", "future")
 
@@ -269,6 +272,13 @@ def compose_note(
     """Assemble the final note markdown from LLM-generated blocks + metadata."""
     today = date.today().isoformat()
     type_value = SECTION_TYPES[section]
+    if section in DEPRECATED_SECTIONS:
+        _logger.warning(
+            "compose_note(section=%r) — this section type is DEPRECATED in v4. "
+            "It is still callable for backward compat but no longer emitted by "
+            "the default --frame=report pipeline.",
+            section,
+        )
     tag_suffix = section.replace("-", "-")  # keep stable; e.g. "api-surface"
     fm_lines = [
         "---",

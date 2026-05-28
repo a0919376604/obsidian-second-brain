@@ -754,3 +754,24 @@ def test_build_overview_prompt_v4_demands_report_blocks():
     # Cross-cutting Imps must follow strict 5-field format
     for field in ("Why", "Evidence", "Effort", "Risk", "Confidence"):
         assert field in prompt
+
+
+def test_compose_note_warns_on_deprecated_section(caplog):
+    """Calling compose_note(section='features'|etc.) still works but logs a deprecation warning."""
+    import logging
+    from scripts.architect.sections import compose_note
+    with caplog.at_level(logging.WARNING):
+        note = compose_note(
+            section="features",
+            project="x",
+            repo_label="local: /tmp/x",
+            commit="a",
+            signal_sources=[],
+            confidence="medium",
+            output_lang="en",
+            generated_blocks={"summary": "Test"},
+        )
+    assert "deprecated" in caplog.text.lower()
+    assert "features" in caplog.text.lower()
+    # Note still produced (backward compat).
+    assert "type: architecture-features" in note
