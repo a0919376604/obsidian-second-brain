@@ -30,6 +30,14 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
   `ai-flows/` notes. Use this if you don't want the AI flow layer for a project.
   Default OFF (AI flows ARE produced when detected).
 
+**v4.2-specific flags:**
+- `--no-features` — even when scanner can produce a features.md, skip Phase
+  3.5.5. Use this if a project doesn't need the product-PM lens. Default OFF
+  (features.md IS produced by default in v4.2+).
+- `--features-only` — diagnostic flag. Run only Phase 1 (scan) + Phase 3.5.5
+  (features synth). Useful for iterating on the features prompt without
+  re-running other sections.
+
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
 
@@ -190,6 +198,105 @@ If `--functions=public`:
 11. Update lockfile `functions[<module>/<func>]`.
 
 Failure isolation: if any one section or function synthesis throws, write the note with `status: scan-failed`, record the error in the body, and continue.
+
+## Phase 3.5.5: Features synthesis (v4.2)
+
+Skip if `--no-features` is passed.
+
+Skip if `sections.features.signal-hash` in lockfile matches current scan signal hash AND `Projects/<P>/Architecture/features.md` exists (refresh logic).
+
+1. Compute signal hash:
+   ```python
+   from scripts.architect.sections import signal_hash
+   feature_signal = {
+       "readme_sections": scan_report["readme_sections"],
+       "agents_md_text": scan_report["agents_md_text"],
+       "changelog": scan_report["changelog"],
+       "api_surface": scan_report["api_surface"],
+       "research_excerpts": [
+           {"path": r["path"], "mtime": (vault_proj / r["path"]).stat().st_mtime}
+           for r in scan_report["research_excerpts"]
+       ],
+       "personas_hash": _sha256_of_personas(arch_dir / "personas.md"),
+   }
+   sig_hash = signal_hash(feature_signal)
+   ```
+
+2. Build prompt:
+   ```python
+   from scripts.architect.sections import build_features_prompt
+   prompt = build_features_prompt(
+       project=project_name,
+       readme_sections=scan_report["readme_sections"],
+       agents_md_text=scan_report["agents_md_text"],
+       changelog=scan_report["changelog"],
+       api_surface_summary=_render_api_surface_summary(scan_report["api_surface"]),
+       modules_summary=_render_modules_summary(manifest_modules, arch_dir / "modules"),
+       personas_summary=_read_personas_excerpt(arch_dir / "personas.md"),
+       research_excerpts=scan_report["research_excerpts"],
+       output_lang=output_lang,
+   )
+   ```
+
+3. Invoke the LLM. Expect strict JSON: 10 keys (capability-inventory as STRUCTURED LIST, others as markdown strings).
+
+4. Two-pass annotation + table render:
+   ```python
+   from scripts.architect.sections import render_features_inventory, compute_doc_sync_score
+   table_md, counts = render_features_inventory(
+       llm_output["capability-inventory"],
+       scan_report["api_surface"],
+       scan_report["git_last_touch"],
+   )
+   # Compute rendered_rows from llm inventory + assigned statuses for doc-sync-score.
+   rendered_rows = [
+       {**row, "status": _status_for_row(row, scan_report["api_surface"])}
+       for row in llm_output["capability-inventory"]
+   ]
+   sync_score = compute_doc_sync_score(rendered_rows)
+   ```
+
+5. Compose note:
+   ```python
+   from scripts.architect.sections import compose_features_note
+   blocks = {**llm_output, "capability-inventory": table_md}
+   note = compose_features_note(
+       project=project_name,
+       repo_label=repo_label,
+       commit=commit,
+       signal_sources=["README.md", "AGENTS.md", "CHANGELOG.md",
+                       "scan: api_surface", "manifest: modules"]
+                      + (["vault: Research/*"] if scan_report["research_excerpts"] else [])
+                      + (["vault: personas.md"] if (arch_dir / "personas.md").exists() else []),
+       confidence="high" if scan_report["research_excerpts"] else "medium",
+       output_lang=output_lang,
+       generated_blocks=blocks,
+       feature_count=counts["online"] + counts["deprecated"],
+       deprecated_count=counts["deprecated"],
+       doc_sync_score=sync_score,
+   )
+   ```
+
+6. Write to `Projects/<P>/Architecture/features.md`.
+
+7. Update lockfile `sections.features`:
+   ```python
+   lockfile.sections["features"] = {
+       "signal-hash": sig_hash,
+       "lang": output_lang,
+       "last-generated": today_iso,
+       "commit": commit,
+       "feature-count": counts["online"] + counts["deprecated"],
+       "deprecated-count": counts["deprecated"],
+       "doc-sync-score": sync_score,
+   }
+   ```
+
+8. Hub block + overview drill-down (idempotent, sentinel-aware):
+   - Hub `Projects/<P>/<P>.md` `<!-- @generated:start architecture-section -->` block: ensure line `- 產品 feature inventory + doc-sync: [[Architecture/features]]` is present once.
+   - `Projects/<P>/Architecture/overview.md` `<!-- @generated:start drill-down -->` block: ensure line `- **產品 feature inventory:** [[features]] (online/deprecated 狀態 + gap analysis + 文件補補丁)` is present once.
+
+If `--features-only`: skip all other Phases (3, 3.5, 3.7, 4) and only run Phase 1 + Phase 3.5.5 + final hub/overview update + lockfile write.
 
 ## Phase 3.7: AI Flow synthesis (v4.1)
 
