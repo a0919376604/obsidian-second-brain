@@ -91,3 +91,106 @@ def test_plan_lists_v3_blocks_to_create(tmp_path: Path):
     expected_v3 = {"scope", "strengths", "weaknesses", "improvements", "dependencies"}
     actual = set(plan.blocks_per_file["modules/backend.md"]["create"])
     assert expected_v3 <= actual, f"missing v3 blocks: {expected_v3 - actual}"
+
+
+def _setup_v3_architecture(arch_root: Path):
+    """Create a synthetic v3 layout: 14 files including the 6 to-be-deleted."""
+    (arch_root / "modules").mkdir(parents=True)
+    (arch_root / "overview.md").write_text(
+        "---\ntype: architecture-overview\nmoc-style: true\n---\n\n"
+        "## For future Claude\nMOC\n"
+    )
+    (arch_root / "future.md").write_text(
+        "---\ntype: architecture-future\n---\n\n"
+        "## 給未來 Claude\nGap analysis.\n\n"
+        "## 已知限制\n"
+        "<!-- @generated:start known-limitations -->\n"
+        "- backend/.env deprecated\n"
+        "- plain-text password fallback\n"
+        "<!-- @generated:end known-limitations -->\n\n"
+        "## 落差分析\nthings.\n"
+    )
+    (arch_root / "decisions.md").write_text(
+        "---\ntype: architecture-decisions\n---\n\n"
+        "## 給未來 Claude\nDecisions index.\n\n"
+        "## 技術棧理由\n"
+        "<!-- @generated:start stack-rationale -->\n- React + FastAPI\n<!-- @generated:end stack-rationale -->\n"
+    )
+    for fname in ("roadmap.md", "jobs.md", "api-surface.md", "features.md", "flows.md", "personas.md"):
+        (arch_root / fname).write_text(f"---\ntype: architecture-{fname.replace('.md', '')}\n---\n\nbody\n")
+    for slug in ("backend", "frontend"):
+        (arch_root / "modules" / f"{slug}.md").write_text(
+            f"---\ntype: architecture-module\n---\n\n## 模組職責\nx\n"
+        )
+
+
+def test_v3_to_v4_plan_lists_6_files_to_delete(tmp_path: Path):
+    from scripts.architect.migration import plan_v3_to_v4_migration
+    arch = tmp_path / "Architecture"
+    _setup_v3_architecture(arch)
+    plan = plan_v3_to_v4_migration(arch)
+    expected_deletes = {"future.md", "roadmap.md", "jobs.md", "api-surface.md", "features.md", "flows.md"}
+    assert set(plan.files_to_delete) == expected_deletes
+
+
+def test_v3_to_v4_plan_keeps_overview_modules_decisions_personas(tmp_path: Path):
+    from scripts.architect.migration import plan_v3_to_v4_migration
+    arch = tmp_path / "Architecture"
+    _setup_v3_architecture(arch)
+    plan = plan_v3_to_v4_migration(arch)
+    kept = set(plan.files_to_keep)
+    assert "overview.md" in kept
+    assert "decisions.md" in kept
+    assert "personas.md" in kept
+    assert "modules/backend.md" in kept
+    assert "modules/frontend.md" in kept
+
+
+def test_v3_to_v4_plan_extracts_known_limitations_from_future(tmp_path: Path):
+    from scripts.architect.migration import plan_v3_to_v4_migration
+    arch = tmp_path / "Architecture"
+    _setup_v3_architecture(arch)
+    plan = plan_v3_to_v4_migration(arch)
+    assert plan.known_limitations_to_migrate is not None
+    assert "backend/.env deprecated" in plan.known_limitations_to_migrate
+    assert "plain-text password fallback" in plan.known_limitations_to_migrate
+
+
+def test_v3_to_v4_apply_deletes_obsolete_files(tmp_path: Path):
+    from scripts.architect.migration import plan_v3_to_v4_migration, apply_v3_to_v4_migration
+    arch = tmp_path / "Architecture"
+    _setup_v3_architecture(arch)
+    plan = plan_v3_to_v4_migration(arch)
+    apply_v3_to_v4_migration(arch, plan, dry_run=False)
+    for fname in ("future.md", "roadmap.md", "jobs.md", "api-surface.md", "features.md", "flows.md"):
+        assert not (arch / fname).exists(), f"{fname} should have been deleted"
+    # Files to keep still present.
+    assert (arch / "overview.md").exists()
+    assert (arch / "decisions.md").exists()
+    assert (arch / "personas.md").exists()
+    assert (arch / "modules" / "backend.md").exists()
+
+
+def test_v3_to_v4_apply_merges_known_limitations_into_decisions(tmp_path: Path):
+    from scripts.architect.migration import plan_v3_to_v4_migration, apply_v3_to_v4_migration
+    arch = tmp_path / "Architecture"
+    _setup_v3_architecture(arch)
+    plan = plan_v3_to_v4_migration(arch)
+    apply_v3_to_v4_migration(arch, plan, dry_run=False)
+    decisions_text = (arch / "decisions.md").read_text(encoding="utf-8")
+    # Known limitations block now present in decisions.md
+    assert "@generated:start known-limitations" in decisions_text
+    assert "backend/.env deprecated" in decisions_text
+
+
+def test_v3_to_v4_dry_run_does_not_modify(tmp_path: Path):
+    from scripts.architect.migration import plan_v3_to_v4_migration, apply_v3_to_v4_migration
+    arch = tmp_path / "Architecture"
+    _setup_v3_architecture(arch)
+    before_future = (arch / "future.md").read_text()
+    before_decisions = (arch / "decisions.md").read_text()
+    plan = plan_v3_to_v4_migration(arch)
+    apply_v3_to_v4_migration(arch, plan, dry_run=True)
+    assert (arch / "future.md").exists()
+    assert (arch / "future.md").read_text() == before_future
+    assert (arch / "decisions.md").read_text() == before_decisions

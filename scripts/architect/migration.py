@@ -116,3 +116,104 @@ def backup_architecture_dir(arch_dir: Path, archive_root: Path | None = None) ->
     with tarfile.open(archive, "w:gz") as tf:
         tf.add(arch_dir, arcname=arch_dir.name)
     return archive
+
+
+V4_FILES_TO_DELETE = (
+    "future.md",
+    "roadmap.md",
+    "jobs.md",
+    "api-surface.md",
+    "features.md",
+    "flows.md",
+)
+
+
+@dataclass
+class V3ToV4Plan:
+    files_to_delete: list[str] = field(default_factory=list)
+    files_to_keep: list[str] = field(default_factory=list)
+    known_limitations_to_migrate: str | None = None
+
+
+_KNOWN_LIM_BLOCK_RE = re.compile(
+    r"<!--\s*@generated:start\s+known-limitations\s*-->\n"
+    r"(?P<body>.*?)\n"
+    r"<!--\s*@generated:end\s+known-limitations\s*-->",
+    re.DOTALL,
+)
+
+
+def plan_v3_to_v4_migration(arch_dir: Path) -> V3ToV4Plan:
+    """Inspect a v3 Architecture/ tree; return what would change for v4."""
+    plan = V3ToV4Plan()
+    if not arch_dir.is_dir():
+        return plan
+    for fname in V4_FILES_TO_DELETE:
+        if (arch_dir / fname).is_file():
+            plan.files_to_delete.append(fname)
+    # Files to keep: top-level .md NOT in delete list, plus modules/*.md
+    for f in sorted(arch_dir.glob("*.md")):
+        if f.name in V4_FILES_TO_DELETE:
+            continue
+        plan.files_to_keep.append(f.name)
+    for f in sorted((arch_dir / "modules").glob("*.md")) if (arch_dir / "modules").is_dir() else []:
+        plan.files_to_keep.append(f"modules/{f.name}")
+    # Extract known-limitations from future.md (if present).
+    future = arch_dir / "future.md"
+    if future.is_file():
+        try:
+            text = future.read_text(encoding="utf-8")
+            m = _KNOWN_LIM_BLOCK_RE.search(text)
+            if m:
+                plan.known_limitations_to_migrate = m.group("body").strip()
+        except UnicodeDecodeError:
+            pass
+    return plan
+
+
+def apply_v3_to_v4_migration(arch_dir: Path, plan: V3ToV4Plan, dry_run: bool = False) -> None:
+    """Carry out the v3 -> v4 migration.
+
+    1. Merge known-limitations into decisions.md (if present).
+    2. Delete the 6 obsolete files.
+    Caller should have already called backup_architecture_dir() for safety.
+    """
+    if dry_run:
+        return
+    # Step 1: Merge known-limitations into decisions.md.
+    if plan.known_limitations_to_migrate:
+        _merge_known_limitations_into_decisions(arch_dir, plan.known_limitations_to_migrate)
+    # Step 2: Delete obsolete files.
+    for fname in plan.files_to_delete:
+        target = arch_dir / fname
+        if target.is_file():
+            target.unlink()
+
+
+def _merge_known_limitations_into_decisions(arch_dir: Path, body: str) -> None:
+    """Append a `## 已知限制 / Known limitations` sentinel block to decisions.md."""
+    decisions = arch_dir / "decisions.md"
+    if not decisions.is_file():
+        return
+    text = decisions.read_text(encoding="utf-8")
+    # Idempotent: if the block already exists, skip.
+    if "@generated:start known-limitations" in text:
+        return
+    # Detect language from existing decisions.md frontmatter.
+    lang = "en"
+    if "lang: zh-TW" in text:
+        lang = "zh-TW"
+    heading_str = "## 已知限制" if lang == "zh-TW" else "## Known limitations"
+    # Insert before the "## Related" / "## 相關" heading if present, else append.
+    related_marker = "## 相關" if lang == "zh-TW" else "## Related"
+    insertion = (
+        f"\n{heading_str}\n"
+        f"<!-- @generated:start known-limitations -->\n"
+        f"{body}\n"
+        f"<!-- @generated:end known-limitations -->\n"
+    )
+    if related_marker in text:
+        text = text.replace(related_marker, insertion + "\n" + related_marker, 1)
+    else:
+        text = text.rstrip() + "\n" + insertion + "\n"
+    decisions.write_text(text, encoding="utf-8")
