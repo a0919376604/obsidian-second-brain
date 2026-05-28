@@ -25,6 +25,11 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
 - `--require-evidence` — default true. When false, LLM may emit Imps without
   Evidence (debugging only).
 
+**v4.1-specific flags:**
+- `--no-ai-flows` — even when scanner detects AI subsystem(s), do NOT produce
+  `ai-flows/` notes. Use this if you don't want the AI flow layer for a project.
+  Default OFF (AI flows ARE produced when detected).
+
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
 
@@ -186,9 +191,87 @@ If `--functions=public`:
 
 Failure isolation: if any one section or function synthesis throws, write the note with `status: scan-failed`, record the error in the body, and continue.
 
-## Phase 4: Overview synthesis (v4 top-down report)
+## Phase 3.7: AI Flow synthesis (v4.1)
+
+For each AI flow in `scan_report["ai_flows"]` (skip if `--no-ai-flows`):
+
+1. Run repomix on `flow["root_path"]`:
+   ```bash
+   repomix --include "<flow.root_path>/**" --style xml --compress --top-files-len 30 -o /tmp/repomix-<slug>.xml
+   ```
+
+2. Build prompt:
+   ```python
+   from scripts.architect.sections import build_ai_flow_prompt
+   prompt = build_ai_flow_prompt(
+       flow_slug=flow["slug"],
+       flow_name=flow["name"],
+       framework=flow["framework"],
+       flow_kind=flow["flow_kind"],
+       prompts_inventory=flow["prompts"],
+       state_module=flow.get("state_module"),
+       graph_files=flow.get("graph_files", []),
+       repomix_packed=repomix_text,
+       output_lang=output_lang,
+   )
+   ```
+
+3. Invoke LLM. Expect strict JSON with 10 block keys (ai-purpose / graph-topology /
+   state-schema / prompts (annotations only) / llm-config / evaluation / strengths /
+   weaknesses / improvements / dependencies).
+
+4. **Prompts block reconstruction.** The LLM's `prompts` value is annotations only -
+   it provides per-prompt `{purpose, type_note}` dict, but does NOT generate the body
+   (bodies come from the inventory verbatim). Reconstruct via:
+   ```python
+   from scripts.architect.sections import render_prompts_block
+   prompts_body = render_prompts_block(
+       inventory=flow["prompts"],
+       annotations=llm_output["prompts_annotations"],  # LLM returns this map
+       lang=output_lang,
+   )
+   ```
+   Then put `prompts_body` into `generated_blocks["prompts"]` for compose_note.
+
+5. Compose: `compose_note(section="ai-flow", project=<P>, ...)`. Frontmatter
+   needs `ai-framework`, `flow-kind`, `maturity` - these are emitted by appending
+   custom fields after the standard set (compose_note doesn't know about them, so
+   merge AFTER the call by string-replace the `tags: ` line):
+   ```python
+   note = compose_note(...)
+   extra_fm = f"ai-framework: {flow['framework']}\nflow-kind: {flow['flow_kind']}\nmaturity: {llm_output.get('maturity', 'Beta')}\n"
+   note = note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+   ```
+
+6. Write to `Projects/<P>/Architecture/ai-flows/<flow-slug>.md` (create
+   `ai-flows/` directory if needed).
+
+7. Update lockfile `ai_flows[<slug>]`:
+   - `signal-hash`, `lang`, `framework`, `last-generated`
+   - Per-prompt sub-dict from inventory (source-hash from each ExtractedPrompt)
+
+8. For each module hosting an AI flow, write a sentinel block via
+   `format_ai_engine_link(...)`. Insert it into `modules/<host>.md` near the top
+   (after `## 給未來 Claude` preamble). Idempotent - sentinel-aware update.
+
+   To determine which module hosts an AI flow:
+   - Match flow's `root_path` against each module's `paths`. First matching
+     module hosts the flow.
+   - Example: flow `lang-ai-customer` at `backend/engines/langgraph` matches
+     module `backend` (paths `["backend/"]`).
+   - For flows that don't match any module's `paths`, skip the link (the
+     `ai-flows/` note still exists, just no module-side back-pointer).
+
+## Phase 4: Overview synthesis (v4 + v4.1)
 
 This is the centerpiece of v4. The overview becomes a self-contained report.
+
+In the Module map section, for each module that hosts an AI flow,
+append ` + AI: [[ai-flows/<slug>]]` to its module line.
+
+In the Drill-down entries section, if `ai-flows/` directory exists,
+add a row:
+- `## AI Flows:` `[[ai-flows/<slug-1>]]` | `[[ai-flows/<slug-2>]]` | ...
 
 1. Gather context inputs:
    - `modules_summary` — slug + display name + 1-line role per module
