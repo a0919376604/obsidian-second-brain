@@ -9,12 +9,14 @@ from datetime import date
 from pathlib import Path
 
 from scripts.architect.adr import discover_decision_docs
+from scripts.architect.ai_flow import detect_ai_flows
 from scripts.architect.api_surface import detect_api_surface
 from scripts.architect.changelog import load_changelog
 from scripts.architect.commit_decisions import extract_commit_decisions
 from scripts.architect.deps import detect_external_deps
 from scripts.architect.entry_points import detect_entry_points
 from scripts.architect.manifest import Manifest
+from scripts.architect.prompt_extract import extract_prompts
 from scripts.architect.proposal import propose_modules_with_heuristics
 from scripts.architect.readme import extract_from_repo
 from scripts.architect.repomix import pack_repo_metadata
@@ -76,6 +78,25 @@ def run_phase_one(repo_root: Path) -> ScanResult:
     api_surface = detect_api_surface(repo_root)
     commit_decisions = [asdict(c) for c in extract_commit_decisions(repo_root, limit=200)]
 
+    # AI flow detection + per-flow prompt extraction (v4.1).
+    ai_flows_data: list[dict] = []
+    for flow in detect_ai_flows(repo_root):
+        flow_dict = {
+            "slug": flow.slug,
+            "name": flow.name,
+            "framework": flow.framework,
+            "root_path": flow.root_path,
+            "flow_kind": flow.flow_kind,
+            "node_count": flow.node_count,
+            "prompt_files": flow.prompt_files,
+            "state_module": flow.state_module,
+            "graph_files": flow.graph_files,
+            "llm_libs": flow.llm_libs,
+            "confidence": flow.confidence,
+            "prompts": [asdict(p) for p in extract_prompts(repo_root / flow.root_path)],
+        }
+        ai_flows_data.append(flow_dict)
+
     scan_report = {
         "files": files,
         "languages": languages,
@@ -92,6 +113,7 @@ def run_phase_one(repo_root: Path) -> ScanResult:
         "todos": todos,
         "api_surface": _api_surface_to_dict(api_surface),
         "commit_decisions": commit_decisions,
+        "ai_flows": ai_flows_data,
     }
 
     return ScanResult(manifest=manifest, scan_report=scan_report)

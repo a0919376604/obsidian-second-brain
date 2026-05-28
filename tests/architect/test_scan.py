@@ -50,3 +50,58 @@ def test_scan_report_includes_narrative_signals(tmp_path: Path):
     assert sr["stack"]["primary-language"] == "Python"
     assert "todos" in sr
     assert "api_surface" in sr
+
+
+def test_scan_report_includes_ai_flows(tmp_path: Path):
+    import subprocess
+    from scripts.architect.scan import run_phase_one
+    # Build a git repo with LangGraph signature.
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\ndependencies = ["langgraph>=0.2"]\n'
+    )
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "graph.py").write_text(
+        'from langgraph.graph import StateGraph\n'
+        'g = StateGraph(dict)\n'
+        'g.add_node("a", lambda s: s)\n'
+        'g.add_node("b", lambda s: s)\n'
+        'g.add_node("c", lambda s: s)\n'
+    )
+    (tmp_path / "app" / "prompts").mkdir()
+    (tmp_path / "app" / "prompts" / "p.py").write_text(
+        'P_PROMPT = """Hello {name}, you are an assistant."""\n'
+    )
+    # Init git so walker.git_metadata doesn't crash.
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "t@e"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "init"], check=True)
+
+    result = run_phase_one(tmp_path)
+    assert "ai_flows" in result.scan_report
+    assert len(result.scan_report["ai_flows"]) == 1
+    flow = result.scan_report["ai_flows"][0]
+    assert flow["framework"] == "langgraph"
+    # Prompts extracted into the flow record
+    assert "prompts" in flow
+    prompt_names = {p["name"] for p in flow["prompts"]}
+    assert "P_PROMPT" in prompt_names
+
+
+def test_scan_report_ai_flows_empty_for_non_ai_project(tmp_path: Path):
+    import subprocess
+    from scripts.architect.scan import run_phase_one
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\ndependencies = ["flask"]\n'
+    )
+    (tmp_path / "main.py").write_text('print("hi")\n')
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "t@e"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "t"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "init"], check=True)
+
+    result = run_phase_one(tmp_path)
+    assert result.scan_report["ai_flows"] == []
