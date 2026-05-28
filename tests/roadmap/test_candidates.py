@@ -274,3 +274,56 @@ def test_v4_1_detect_candidates_no_ai_flows_dir_still_works(tmp_path):
     )
     cands = detect_candidates(tmp_path)
     assert any("backend Imp" in c.title for c in cands)
+
+
+def test_detect_candidates_walks_features_md_missing_features_block(tmp_path):
+    """detect_candidates picks up missing-features H3 entries from features.md."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    arch.mkdir()
+    (arch / "features.md").write_text(
+        "---\ntype: architecture-features\n---\n\n"
+        "## 可加 features\n"
+        "<!-- @generated:start missing-features -->\n"
+        "### Multi-channel inbox\n"
+        "- **為什麼:** 客戶開始要求 WhatsApp 整合\n"
+        "- **證據:** [[Research/line-bot-trends]]\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** 客戶轉投競品\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end missing-features -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    multichannel = next(
+        (c for c in cands if "Multi-channel" in c.title), None
+    )
+    assert multichannel is not None, f"missing-features entry not picked up; got {[c.title for c in cands]}"
+    # Research wikilink in Evidence → priority high.
+    assert multichannel.priority == "high"
+
+
+def test_detect_candidates_features_imp_without_research_is_normal_priority(tmp_path):
+    """missing-features Evidence with persona / code-pattern but no [[Research/]] → normal."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    arch.mkdir()
+    (arch / "features.md").write_text(
+        "---\ntype: architecture-features\n---\n\n"
+        "## 可加 features\n"
+        "<!-- @generated:start missing-features -->\n"
+        "### Shift handoff\n"
+        "- **為什麼:** Persona Mary 跨班沒工具\n"
+        "- **證據:** [[Architecture/personas#Mary]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 客服漏接\n"
+        "- **Confidence:** high\n"
+        "<!-- @generated:end missing-features -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    shift = next((c for c in cands if "Shift handoff" in c.title), None)
+    assert shift is not None
+    assert shift.priority == "normal"

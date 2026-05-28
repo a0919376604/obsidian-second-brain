@@ -22,6 +22,9 @@ class Candidate:
     effort: str | None = None
     risk_if_not_done: str | None = None
     confidence: str | None = None
+    candidate_type: str | None = None
+    priority: str = "normal"
+    source: str | None = None
 
 
 # Section heading -> (kind, source-file)
@@ -51,10 +54,11 @@ _NUMBERED_RE = re.compile(r"^\d+\.\s+(.+)$", re.MULTILINE)
 def detect_candidates(project_root: Path) -> list[Candidate]:
     """Walk Architecture/ files, extract candidates.
 
-    v4: only reads overview.md, modules/*.md, and decisions.md `## 改進機會`
+    v4: reads overview.md, modules/*.md, and decisions.md `## 改進機會`
     or `## Improvement opportunities` blocks. Legacy v3 files (future.md,
-    roadmap.md, jobs.md, api-surface.md, features.md, flows.md) are NOT walked
-    even if they exist — those go through v3->v4 migration first.
+    roadmap.md, jobs.md, api-surface.md, flows.md) are NOT walked even if
+    they exist. v4.2 re-introduces features.md, but only via generated
+    missing-features / improvements / doc-sync-actions sentinel blocks.
 
     Also extracts `## 已知限制` from decisions.md as kind=limitation candidates.
     """
@@ -84,6 +88,10 @@ def detect_candidates(project_root: Path) -> list[Candidate]:
     if (arch / "decisions.md").is_file():
         out.extend(_extract_from_file(arch / "decisions.md", _DECISIONS_SECTIONS))
         out.extend(_extract_known_limitations(arch / "decisions.md", arch))
+
+    # v4.2: product-PM features lens feeds roadmap signal via generated blocks.
+    if (arch / "features.md").is_file():
+        out.extend(_extract_features_candidates(arch / "features.md", arch))
 
     return _dedup(out)
 
@@ -169,6 +177,152 @@ def _extract_known_limitations(path: Path, arch_root: Path) -> list[Candidate]:
                 raw_text=raw.strip(),
             ))
     return out
+
+
+def _extract_features_candidates(path: Path, arch_root: Path) -> list[Candidate]:
+    """Extract v4.2 candidates from generated blocks in Architecture/features.md."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return []
+
+    out: list[Candidate] = []
+    rel = path.relative_to(arch_root.parent).as_posix().replace(".md", "")
+
+    missing_body = _extract_generated_block(text, "missing-features")
+    if missing_body:
+        for entry in _parse_feature_imp_entries(missing_body):
+            priority = "high" if _has_research_wikilink(entry["evidence"]) else "normal"
+            out.append(_candidate_from_feature_imp(
+                entry,
+                rel=rel,
+                block="missing-features",
+                kind="missing-feature",
+                priority=priority,
+            ))
+
+    improvements_body = _extract_generated_block(text, "improvements")
+    if improvements_body:
+        for entry in _parse_feature_imp_entries(improvements_body):
+            out.append(_candidate_from_feature_imp(
+                entry,
+                rel=rel,
+                block="improvements",
+                kind="feature-improvement",
+                priority="normal",
+            ))
+
+    doc_actions_body = _extract_generated_block(text, "doc-sync-actions")
+    if doc_actions_body:
+        from scripts.architect.sections import parse_doc_actions_block
+
+        for action in parse_doc_actions_block(doc_actions_body):
+            title = action["text"][:80]
+            out.append(Candidate(
+                id=_make_id("doc-action", _normalize_title(title)),
+                title=title,
+                source_wikilink=f"[[{rel}#Doc sync actions]]",
+                source_line=0,
+                kind="doc-action",
+                raw_text=action["text"],
+                why=f"Doc sync: {action['group']}",
+                evidence=[],
+                effort="S",
+                risk_if_not_done="文件持續漂移降低 onboarding 速度",
+                confidence="stated",
+                candidate_type="doc-action",
+                priority="low",
+                source="features.md#doc-sync-actions",
+            ))
+
+    return out
+
+
+def _extract_generated_block(text: str, name: str) -> str | None:
+    """Extract content between <!-- @generated:start <name> --> and end markers."""
+    start = f"<!-- @generated:start {name} -->"
+    end = f"<!-- @generated:end {name} -->"
+    s = text.find(start)
+    if s == -1:
+        return None
+    s += len(start)
+    e = text.find(end, s)
+    if e == -1:
+        return None
+    return text[s:e].strip()
+
+
+_FEATURE_ENTRY_TITLE_RE = re.compile(r"^###\s+(?:Imp\s+\d+:\s+)?(.+?)\s*$", re.MULTILINE)
+_FEATURE_FIELD_RE = re.compile(r"^-\s+\*\*(.+?):\*\*\s*(.+)$", re.MULTILINE)
+_FEATURE_FIELD_ALIASES = {
+    "why": "why",
+    "為什麼": "why",
+    "evidence": "evidence",
+    "證據": "evidence",
+    "effort": "effort",
+    "risk if not done": "risk_if_not_done",
+    "未做的風險": "risk_if_not_done",
+    "risk": "risk_if_not_done",
+    "confidence": "confidence",
+}
+
+
+def _parse_feature_imp_entries(body: str) -> list[dict]:
+    """Parse features.md H3 ImprovementItem-like entries."""
+    parts = _FEATURE_ENTRY_TITLE_RE.split(body)
+    if len(parts) < 3:
+        return []
+    entries: list[dict] = []
+    for i in range(1, len(parts), 2):
+        title = parts[i].strip()
+        entry_body = parts[i + 1] if i + 1 < len(parts) else ""
+        fields: dict[str, str] = {}
+        for m in _FEATURE_FIELD_RE.finditer(entry_body):
+            key = _FEATURE_FIELD_ALIASES.get(m.group(1).strip().lower())
+            if key:
+                fields[key] = m.group(2).strip()
+        required = {"why", "evidence", "effort", "risk_if_not_done", "confidence"}
+        if not required.issubset(fields):
+            continue
+        entries.append({
+            "title": title,
+            "why": fields["why"],
+            "evidence": [e.strip() for e in fields["evidence"].split("|") if e.strip()],
+            "effort": fields["effort"],
+            "risk_if_not_done": fields["risk_if_not_done"],
+            "confidence": fields["confidence"],
+        })
+    return entries
+
+
+def _has_research_wikilink(evidence: list[str]) -> bool:
+    return any("[[Research/" in e or "[[research/" in e for e in evidence)
+
+
+def _candidate_from_feature_imp(
+    entry: dict,
+    *,
+    rel: str,
+    block: str,
+    kind: str,
+    priority: str,
+) -> Candidate:
+    return Candidate(
+        id=_make_id(kind, _normalize_title(entry["title"])),
+        title=entry["title"],
+        source_wikilink=f"[[{rel}#{block}]]",
+        source_line=0,
+        kind=kind,
+        raw_text=entry["why"],
+        why=entry["why"],
+        evidence=entry["evidence"],
+        effort=entry["effort"],
+        risk_if_not_done=entry["risk_if_not_done"],
+        confidence=entry["confidence"],
+        candidate_type=kind,
+        priority=priority,
+        source=f"features.md#{block}",
+    )
 
 
 def _extract_from_file(path: Path, section_to_kind: dict[str, str], freq_dedup: bool = False) -> list[Candidate]:
