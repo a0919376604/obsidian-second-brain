@@ -49,6 +49,8 @@ def detect_ai_flows(repo_root: Path) -> list[AIFlow]:
     1. Identify candidate roots (dirs containing graph.py | pipeline.py | agents/ | workflows/).
     2. For each candidate, check framework signal + node count.
     3. Drop candidates failing NODE_THRESHOLD (default 3).
+    4. Drop ancestor candidates when a more-specific nested flow also qualified
+       (e.g. backend/engines is dropped when backend/engines/langgraph qualifies).
     """
     repo_root = repo_root.resolve()
     flows: list[AIFlow] = []
@@ -62,7 +64,24 @@ def detect_ai_flows(repo_root: Path) -> list[AIFlow]:
         flow = _classify_candidate(candidate_root, repo_root, deps)
         if flow and flow.node_count >= NODE_THRESHOLD:
             flows.append(flow)
-    return flows
+    return _drop_ancestor_duplicates(flows)
+
+
+def _drop_ancestor_duplicates(flows: list[AIFlow]) -> list[AIFlow]:
+    """Drop any flow whose root_path is a strict ancestor of another flow's root_path.
+
+    Example: if both `backend/engines` and `backend/engines/langgraph` qualified,
+    the nested one is more specific and the parent is almost certainly a false
+    positive caused by stray .py files in the parent dir matching `_AI_DIR_NAMES`.
+    """
+    roots = [f.root_path for f in flows]
+    keep: list[AIFlow] = []
+    for flow in flows:
+        prefix = flow.root_path + "/"
+        if any(other != flow.root_path and other.startswith(prefix) for other in roots):
+            continue
+        keep.append(flow)
+    return keep
 
 
 # ---------- candidate identification ----------
@@ -135,26 +154,29 @@ def _classify_candidate(candidate: Path, repo_root: Path, deps: list[str]) -> AI
     slug = _slugify_root(rel_root)
     name = _display_name(candidate)
 
-    # Classify framework.
-    if has_langgraph_dep or has_langgraph_import:
+    # Classification order: LOCAL evidence beats repo-level dependency lists.
+    # A repo's pyproject may declare `langgraph` because ONE subsystem uses it,
+    # but other subsystems can be plain custom pipelines (openai-only) - those
+    # must classify as custom-pipeline, not langgraph.
+    #
+    # Within LOCAL evidence, structural signals (pipeline.py + nodes/ + prompts.toml)
+    # beat utility-import signals like `from langchain_core.documents import Document`,
+    # which appear in plenty of custom pipelines that just use LangChain helper types.
+    has_pipeline_file = any(p.name == "pipeline.py" for p in py_files)
+    has_nodes_dir = (candidate / "nodes").is_dir()
+
+    # 1) Strong local LangGraph signal (StateGraph / add_node pattern is unmistakable).
+    if has_langgraph_import:
         return AIFlow(
             slug=slug, name=name, framework="langgraph", root_path=rel_root,
             flow_kind=_infer_flow_kind(candidate, py_files),
             node_count=node_count, prompt_files=prompt_files,
             state_module=state_module, graph_files=graph_files, llm_libs=llm_libs,
-            confidence="stated" if has_langgraph_dep and has_langgraph_import else "high",
+            confidence="stated" if has_langgraph_dep else "high",
         )
-    if has_langchain_dep or has_langchain_import:
-        return AIFlow(
-            slug=slug, name=name, framework="langchain", root_path=rel_root,
-            flow_kind=_infer_flow_kind(candidate, py_files),
-            node_count=node_count, prompt_files=prompt_files,
-            state_module=None, graph_files=graph_files, llm_libs=llm_libs,
-            confidence="high",
-        )
-    # Custom pipeline: has pipeline.py + nodes/ + prompts + LLM lib usage.
-    has_pipeline_file = any(p.name == "pipeline.py" for p in py_files)
-    has_nodes_dir = (candidate / "nodes").is_dir()
+    # 2) Strong structural custom-pipeline signal (pipeline.py + nodes/ + prompts + LLM).
+    # Checked BEFORE langchain-import because `langchain_core.documents` etc are
+    # utility types used widely in non-LangChain-orchestrated pipelines.
     if has_pipeline_file and has_nodes_dir and (has_llm_dep or llm_libs) and prompt_files:
         return AIFlow(
             slug=slug, name=name, framework="custom-pipeline", root_path=rel_root,
@@ -162,6 +184,33 @@ def _classify_candidate(candidate: Path, repo_root: Path, deps: list[str]) -> AI
             node_count=node_count, prompt_files=prompt_files,
             state_module=None, graph_files=[],
             llm_libs=llm_libs, confidence="medium",
+        )
+    # 3) Moderate local LangChain signal (no structural custom-pipeline pattern).
+    if has_langchain_import:
+        return AIFlow(
+            slug=slug, name=name, framework="langchain", root_path=rel_root,
+            flow_kind=_infer_flow_kind(candidate, py_files),
+            node_count=node_count, prompt_files=prompt_files,
+            state_module=None, graph_files=graph_files, llm_libs=llm_libs,
+            confidence="stated" if has_langchain_dep else "high",
+        )
+    # 4) Fallback: repo-level dep mention only (no local imports). Rare but
+    # keeps coverage for projects where graph wiring lives in a different file.
+    if has_langgraph_dep:
+        return AIFlow(
+            slug=slug, name=name, framework="langgraph", root_path=rel_root,
+            flow_kind=_infer_flow_kind(candidate, py_files),
+            node_count=node_count, prompt_files=prompt_files,
+            state_module=state_module, graph_files=graph_files, llm_libs=llm_libs,
+            confidence="medium",
+        )
+    if has_langchain_dep:
+        return AIFlow(
+            slug=slug, name=name, framework="langchain", root_path=rel_root,
+            flow_kind=_infer_flow_kind(candidate, py_files),
+            node_count=node_count, prompt_files=prompt_files,
+            state_module=None, graph_files=graph_files, llm_libs=llm_libs,
+            confidence="medium",
         )
     return None
 
