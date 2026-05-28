@@ -527,12 +527,13 @@ Steps:
 
 **Codebase architecture documentation.**
 
-- `/obsidian-architect <repo-path>` — Scan a codebase and produce judgment-driven
-  architecture notes: overview + per-module designs + product-eye layer
-  (personas, jobs, flows). Each file captures design strengths, weaknesses,
-  and Evidence-grounded improvement opportunities — the kind of insight the
-  codebase itself does NOT record. Improvement opportunities are the primary
-  signal source for `/obsidian-roadmap`.
+- `/obsidian-architect <repo-path>` — Generate a self-contained, top-down
+  architecture report (v4). Reader opens `Architecture/overview.md` once
+  and gets purpose → system diagram → stack → capabilities → flows →
+  module map → cross-cutting improvements → drill-down. Detail files
+  (5 per-module judgment notes + decisions + personas) are drill-down
+  references only. 8 files total; no MOC fragmentation. Feeds
+  `/obsidian-roadmap` Phase 1 via `## Improvement opportunities` blocks.
 
 ---
 
