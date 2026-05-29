@@ -1,3 +1,59 @@
+## Resolution log
+
+All four codex-run blockers resolved inline (Tasks 2, 3, 6, 15):
+
+**Task 2 — `_REDUCER_DEF_RE` unterminated character set.** The plan's regex
+`r"...->\s*[A-Za-z\[\]"` had an unterminated character class. Replaced with the
+tighter pattern from spec `r"def\s+(?P<name>add_messages\w*|\w+_reducer)\s*\("`,
+which matches the langlive `add_messages_limited` case and is anchored to
+function names containing `add_messages*` or `*_reducer`. Implementation in
+`scripts/architect/ai_memory_detect.py`; 7 tests pass (Task 2 + Task 3 edge
+cases folded into one file, plus the false-positive guard added below).
+
+**Task 3 — depends on Task 2.** Resolved with Task 2 (4 edge-case tests sit
+next to the happy-path tests in the same file).
+
+**Task 6 — scanner integration.** Added `detect_memory` + `detect_rag` calls
+to `scripts/architect/scan.py:run_phase_one`. `scan_report` now exposes
+`ai_memory` + `ai_rag` keys. 2 integration tests in
+`tests/architect/test_ai_memory_rag_compose.py`.
+
+**Task 15 — smoke surfaced 3 detector false-positives.** Re-run scanner against
+langlive-line-oa found:
+
+1. `backends=['base', 'redis']` — `langgraph.checkpoint.base` is the abstract
+   base module, not a backend. Fixed via `_LANGGRAPH_CHECKPOINT_NON_BACKEND`
+   exclusion set (`base` / `serde` / `__init__` / `abc`).
+2. `qdrant` false-positive — `mem0_memory.py` contains the literal string
+   `"qdrant"` as a config option. Fixed by tightening `_VECTOR_STORE_HINTS`
+   to require import-pattern matches (`"import weaviate"`, `"qdrant_client"`)
+   rather than bare substrings.
+3. `role=both` for both flows — `qa_to_kb/evaluation/` contains eval-only
+   code exercising both read + write paths. Fixed by skipping `evaluation/`,
+   `tests/`, `test/`, `examples/`, `__pycache__/` subdirectories in role
+   classification (still counted for vector store / embedding / rerank
+   inventory; those signals are valid wherever they appear).
+
+3 new tests lock the fixes in (one per false-positive).
+
+**One known limitation:** for langlive, `embedding_aligned: true` is reported
+even though the production retrieve path (engines using Gemini
+`text-embedding-004`) does NOT align with qa_to_kb's writes (OpenAI
+`text-embedding-3-small`). Cause: engines is a genuine `role=both` flow (does
+both `/load-data` writes AND FAQ retrieve reads) AND its code references
+BOTH embedding model strings. The detector aggregates all per-flow models
+into both write+read sets, so they appear aligned at set level. Per-call-site
+model attribution is out of scope for regex-level detection — the LLM
+synthesis prompt for `rag.md` has access to all per-flow signals and can
+surface this nuance in prose. (Possible future enhancement: track which
+embedding model lives in which file, then map files to read vs write call
+sites.)
+
+**Final state:** 395 tests pass (319 baseline + 76 across v4.1 / v4.2 / v4.3);
+4 platform adapters build; langlive smoke returns clean memory data
+(redis backend correctly identified, no `base` pollution) and correct role
+classification for both flows (engines=both, qa_to_kb=write).
+
 # obsidian-architect v4.3 (AI memory + RAG cross-flow notes) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
