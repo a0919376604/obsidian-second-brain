@@ -19,6 +19,7 @@ from pathlib import Path
 
 _GLOBAL_SENTINELS = ("global", "_", "-")
 _LOCAL_PATH_RE = re.compile(r'^local-path:\s*"?(?P<path>[^"\n]+)"?\s*$', re.MULTILINE)
+_FUZZY_THRESHOLD = 0.75
 
 
 @dataclass
@@ -137,7 +138,7 @@ def _resolve_absolute_path(token: str, vault_root: Path) -> RepoResolution:
 
 
 def _resolve_project_name(token: str, vault_root: Path) -> RepoResolution:
-    """Project-name branch: exact match first."""
+    """Project-name branch: exact match first, then fuzzy."""
     projects_dir = vault_root / "Projects"
     if not projects_dir.is_dir():
         return RepoResolution(
@@ -145,6 +146,7 @@ def _resolve_project_name(token: str, vault_root: Path) -> RepoResolution:
             candidates=[],
             message="vault has no Projects/ folder",
         )
+
     exact = projects_dir / token
     if exact.is_dir():
         return RepoResolution(
@@ -152,8 +154,34 @@ def _resolve_project_name(token: str, vault_root: Path) -> RepoResolution:
             project_slug=token,
             project_dir=exact,
         )
+
+    all_projects = _list_projects(vault_root)
+    token_lower = token.lower()
+    candidates: list[str] = []
+    for name in all_projects:
+        name_lower = name.lower()
+        if token_lower in name_lower or name_lower in token_lower:
+            candidates.append(name)
+            continue
+        ratio = SequenceMatcher(None, token_lower, name_lower).ratio()
+        if ratio >= _FUZZY_THRESHOLD:
+            candidates.append(name)
+
+    if candidates:
+        return RepoResolution(
+            state="ambiguous",
+            candidates=candidates,
+            message=(
+                f"{token!r} matches multiple/uncertain candidates: {candidates}. "
+                "Please confirm which project to use."
+            ),
+        )
+
     return RepoResolution(
         state="unknown",
-        candidates=_list_projects(vault_root),
-        message=f"no project named {token!r}; available: {_list_projects(vault_root)}",
+        candidates=all_projects,
+        message=(
+            f"no project named {token!r}. Available: {all_projects}. "
+            "Pass one as <repo> or run /obsidian-project <name> to create."
+        ),
     )

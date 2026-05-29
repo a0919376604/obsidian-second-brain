@@ -113,3 +113,40 @@ def test_resolve_repo_arg_absolute_path_multiple_match(tmp_path: Path):
     )
     assert res.state == "ambiguous"
     assert set(res.candidates) == {"proj-a", "proj-b"}
+
+
+def test_resolve_repo_arg_fuzzy_substring_match_single(tmp_path: Path):
+    """'langlive' is substring of one project -> state='ambiguous'."""
+    vault = _make_vault(tmp_path, ["langlive-line-oa", "other-thing"])
+    res = resolve_repo_arg("langlive", vault_root=vault, allow_global=False)
+    assert res.state == "ambiguous"
+    assert "langlive-line-oa" in res.candidates
+
+
+def test_resolve_repo_arg_fuzzy_substring_match_multiple(tmp_path: Path):
+    """'service' is substring of multiple projects -> state='ambiguous'."""
+    vault = _make_vault(tmp_path, ["ai-eden-service", "user-service", "billing-service"])
+    res = resolve_repo_arg("service", vault_root=vault, allow_global=False)
+    assert res.state == "ambiguous"
+    assert set(res.candidates) >= {"ai-eden-service", "user-service", "billing-service"}
+
+
+def test_resolve_repo_arg_fuzzy_levenshtein_match(tmp_path: Path):
+    """Single edit-distance typo on project name -> ambiguous with the candidate."""
+    vault = _make_vault(tmp_path, ["langlive-line-oa", "other-thing"])
+    res = resolve_repo_arg("langlivee-line-oa", vault_root=vault, allow_global=False)
+    assert res.state == "ambiguous"
+    assert "langlive-line-oa" in res.candidates
+
+
+def test_resolve_repo_arg_unknown_project_name(tmp_path: Path):
+    """Token not matching anything -> state='unknown' with full project list."""
+    vault = _make_vault(tmp_path, ["langlive-line-oa", "ai-eden-service"])
+    res = resolve_repo_arg(
+        "totally-unrelated-name",
+        vault_root=vault,
+        allow_global=False,
+    )
+    assert res.state == "unknown"
+    assert set(res.candidates) == {"langlive-line-oa", "ai-eden-service"}
+    assert "totally-unrelated-name" in res.message
