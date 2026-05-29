@@ -93,6 +93,9 @@ def detect_candidates(project_root: Path) -> list[Candidate]:
     if (arch / "features.md").is_file():
         out.extend(_extract_features_candidates(arch / "features.md", arch))
 
+    # v4.3: AI memory + RAG cross-flow notes feed roadmap signal via generated blocks.
+    out.extend(_extract_ai_cross_flow_candidates(arch))
+
     return _dedup(_dedup_candidates(out))
 
 
@@ -235,6 +238,42 @@ def _extract_features_candidates(path: Path, arch_root: Path) -> list[Candidate]
                 source="features.md#doc-sync-actions",
             ))
 
+    return out
+
+
+def _extract_ai_cross_flow_candidates(arch_root: Path) -> list[Candidate]:
+    """Extract v4.3 candidates from generated blocks in ai-flows/memory.md and rag.md."""
+    out: list[Candidate] = []
+    for fname, candidate_type, default_priority in (
+        ("ai-flows/memory.md", "ai-memory-improvement", "normal"),
+        ("ai-flows/rag.md", "ai-rag-improvement", "normal"),
+    ):
+        note_path = arch_root / fname
+        if not note_path.exists():
+            continue
+        try:
+            text = note_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        imp_body = _extract_generated_block(text, "improvements")
+        if not imp_body:
+            continue
+        rel = note_path.relative_to(arch_root.parent).as_posix().replace(".md", "")
+        for entry in _parse_feature_imp_entries(imp_body):
+            priority = default_priority
+            if fname.endswith("rag.md") and any(
+                "embedding-aligned" in evidence.lower() for evidence in entry["evidence"]
+            ):
+                priority = "high"
+            cand = _candidate_from_feature_imp(
+                entry,
+                rel=rel,
+                block="improvements",
+                kind=candidate_type,
+                priority=priority,
+            )
+            cand.source = f"{fname}#improvements"
+            out.append(cand)
     return out
 
 

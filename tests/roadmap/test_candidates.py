@@ -407,3 +407,54 @@ def test_detect_candidates_dedup_features_vs_module_when_module_imp_is_structure
     assert "Streaming reply tech impl" not in titles, (
         f"expected module Imp deduped against features Imp; got {titles}"
     )
+
+
+def test_detect_candidates_walks_ai_memory_md(tmp_path):
+    """detect_candidates picks up improvements block from ai-flows/memory.md."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    (arch / "ai-flows").mkdir(parents=True)
+    (arch / "ai-flows" / "memory.md").write_text(
+        "---\ntype: architecture-ai-memory\n---\n\n"
+        "## 改進機會\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Add TTL to SimpleRedisSaver keys\n"
+        "- **為什麼:** 無 TTL → 無限長 session state\n"
+        "- **證據:** [[Architecture/ai-flows/memory#Scope & lifecycle]]\n"
+        "- **Effort:** S\n"
+        "- **未做的風險:** Redis 容量爆\n"
+        "- **Confidence:** high\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    assert any("TTL" in t for t in titles), f"memory Imp not picked up; got {titles}"
+
+
+def test_detect_candidates_rag_md_embedding_aligned_evidence_raises_priority(tmp_path):
+    """When an Imp from rag.md cites embedding-aligned: false evidence, priority becomes high."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    (arch / "ai-flows").mkdir(parents=True)
+    (arch / "ai-flows" / "rag.md").write_text(
+        "---\ntype: architecture-ai-rag\nembedding-aligned: false\n---\n\n"
+        "## 改進機會\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Align write+read embedding providers\n"
+        "- **為什麼:** embedding-aligned: false → vector space 不一致\n"
+        "- **證據:** [[Architecture/ai-flows/rag#Embedding providers]] (embedding-aligned: false)\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** retrieve recall 受損\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    align = next((c for c in cands if "Align" in c.title), None)
+    assert align is not None, f"rag Imp not picked up; cands={[c.title for c in cands]}"
+    assert align.priority == "high", (
+        f"expected priority=high due to embedding-aligned evidence; got {align.priority}"
+    )
