@@ -206,3 +206,68 @@ def test_build_ai_rag_prompt_aligned_true_no_warning():
     )
     # The prompt MUST NOT insist on a misalignment Imp.
     assert "MUST flag the mismatch" not in prompt
+
+
+def test_compose_ai_memory_note_emits_extra_frontmatter():
+    from scripts.architect.sections import compose_ai_memory_note
+
+    blocks = {n: f"body for {n}" for n in (
+        "summary", "flow-memory-map", "backend-and-storage", "scope-and-lifecycle",
+        "context-window-management", "compaction-strategy", "long-term-vs-short",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    )}
+    note = compose_ai_memory_note(
+        project="P",
+        repo_label="local: /tmp/p",
+        commit="abc1234",
+        signal_sources=["scan: ai_memory"],
+        confidence="high",
+        output_lang="zh-TW",
+        generated_blocks=blocks,
+        memory_flows=1,
+        stateless_flows=1,
+        backend="redis",
+    )
+    assert "memory-flows: 1" in note
+    assert "stateless-flows: 1" in note
+    assert 'backend: "redis"' in note
+    # Order: extra fields before ai-first: true.
+    fm = note.split("---", 2)[1]
+    assert fm.index("memory-flows") < fm.index("ai-first")
+
+
+def test_compose_ai_rag_note_emits_embedding_aligned_bool_or_null():
+    from scripts.architect.sections import compose_ai_rag_note
+
+    blocks = {n: f"body for {n}" for n in (
+        "summary", "rag-data-flow", "ingest-pipeline", "vector-store-config",
+        "retrieve-strategy", "embedding-providers", "evaluation",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    )}
+    # Case 1: aligned is false.
+    note_false = compose_ai_rag_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["scan: ai_rag"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        rag_flows_read=1, rag_flows_write=1, vector_store="weaviate",
+        embedding_aligned=False,
+    )
+    assert "embedding-aligned: false" in note_false
+    # Case 2: aligned is None.
+    note_null = compose_ai_rag_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["scan: ai_rag"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        rag_flows_read=1, rag_flows_write=0, vector_store="weaviate",
+        embedding_aligned=None,
+    )
+    assert "embedding-aligned: null" in note_null
+    # Case 3: aligned is True.
+    note_true = compose_ai_rag_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["scan: ai_rag"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        rag_flows_read=1, rag_flows_write=1, vector_store="weaviate",
+        embedding_aligned=True,
+    )
+    assert "embedding-aligned: true" in note_true

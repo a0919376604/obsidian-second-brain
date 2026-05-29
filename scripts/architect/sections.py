@@ -409,6 +409,80 @@ def compose_note(
     return "\n".join(fm_lines + body_parts) + "\n"
 
 
+def compose_ai_memory_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    memory_flows: int,
+    stateless_flows: int,
+    backend: str,
+) -> str:
+    """Wrap compose_note(section='ai-memory', ...) and merge 3 extra frontmatter
+    fields BEFORE `ai-first: true`."""
+    note = compose_note(
+        section="ai-memory",
+        project=project,
+        repo_label=repo_label,
+        commit=commit,
+        signal_sources=signal_sources,
+        confidence=confidence,
+        output_lang=output_lang,
+        generated_blocks=generated_blocks,
+    )
+    extra_fm = (
+        f"memory-flows: {memory_flows}\n"
+        f"stateless-flows: {stateless_flows}\n"
+        f'backend: "{backend}"\n'
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
+def compose_ai_rag_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    rag_flows_read: int,
+    rag_flows_write: int,
+    vector_store: str,
+    embedding_aligned: bool | None,
+) -> str:
+    """Wrap compose_note(section='ai-rag', ...) and merge 4 extra frontmatter
+    fields. `embedding_aligned` is rendered as YAML `true` / `false` / `null`."""
+    note = compose_note(
+        section="ai-rag",
+        project=project,
+        repo_label=repo_label,
+        commit=commit,
+        signal_sources=signal_sources,
+        confidence=confidence,
+        output_lang=output_lang,
+        generated_blocks=generated_blocks,
+    )
+    if embedding_aligned is None:
+        aligned_value = "null"
+    elif embedding_aligned is True:
+        aligned_value = "true"
+    else:
+        aligned_value = "false"
+    extra_fm = (
+        f"rag-flows-read: {rag_flows_read}\n"
+        f"rag-flows-write: {rag_flows_write}\n"
+        f'vector-store: "{vector_store}"\n'
+        f"embedding-aligned: {aligned_value}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def _preamble_for(section: str, lang: str) -> str:
     """Short preamble describing the note's purpose to future-Claude."""
     if lang == "zh-TW":
