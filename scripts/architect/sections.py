@@ -1129,6 +1129,122 @@ def build_ai_memory_prompt(
     ])
 
 
+def build_ai_rag_prompt(
+    *,
+    project: str,
+    ai_rag_signals: dict,
+    ai_flows_summary: list[dict],
+    output_lang: str,
+) -> str:
+    """v4.3 — AI RAG cross-flow synthesis prompt.
+
+    11 @generated blocks. When summary.embedding_aligned is False, prompt
+    instructs LLM to flag the mismatch in weaknesses AND open an Imp to
+    align providers.
+    """
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫所有散文。Code identifier、檔案路徑、env var、"
+            "model 字串保持原文。Mermaid node ID 也保持英文。"
+        )
+        absence_label = "未偵測到"
+        improvement_shape = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = "Write all prose in English. Code identifiers stay verbatim."
+        absence_label = "(not detected)"
+        improvement_shape = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    summary = ai_rag_signals.get("summary", {})
+    embedding_aligned = summary.get("embedding_aligned")
+
+    if embedding_aligned is False:
+        alignment_directive = (
+            "5. **embedding_aligned is `false`.** weaknesses block MUST contain a "
+            "bullet flagging the embedding provider mismatch. improvements block "
+            "MUST contain an Imp to align providers (Confidence: stated). "
+            "Embedding-providers block MUST include a ⚠️ row pointing at the mismatch."
+        )
+    else:
+        alignment_directive = (
+            "5. embedding_aligned is "
+            f"`{embedding_aligned}` — no special-case warning required."
+        )
+
+    flows_inventory = "\n".join(
+        f"  - {f['slug']} ({f['framework']}, {f['root_path']})"
+        for f in ai_flows_summary
+    ) or "  (no AI flows)"
+
+    return "\n".join([
+        f"You are documenting the **cross-flow RAG lens** for project `{project}`.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. NO invention. Empty/null/false signals → prose says "
+        f"'{absence_label} <field>'.",
+        "2. Per-flow detail wikilinks to `[[ai-flows/<slug>#LLM config]]` and "
+        "`[[ai-flows/<slug>#State schema]]`; do not rehash.",
+        "3. Tight bullet shape for strengths/weaknesses.",
+        "4. ImprovementItem shape for improvements.",
+        alignment_directive,
+        "",
+        "## Output: produce 11 @generated blocks (JSON keys)",
+        "",
+        "### `summary`",
+        "1 paragraph. Which flows read, which write, vector store, primary embedding. "
+        "**embedding-aligned flag explicit one-liner** (e.g. '⚠️ embedding 不對齊').",
+        "",
+        "### `rag-data-flow`",
+        "ONE Mermaid graph: ingest pipeline (writer flow) → vector store → retrieve "
+        "(reader flow). Each node label includes `path` annotation.",
+        "",
+        "### `ingest-pipeline`",
+        "Write side: chunking (splitter, size, overlap), embedding provider/model/dims, "
+        "upsert pattern, schema, re-index trigger.",
+        "",
+        "### `vector-store-config`",
+        "Store choice, schema, multi-tenancy, index versioning, capacity bound.",
+        "",
+        "### `retrieve-strategy`",
+        "Read side: search backend (hybrid α / BM25 / vector-only), top-k, rerank lib, "
+        "MMR, metadata filter.",
+        "",
+        "### `embedding-providers`",
+        "Per-flow: lib + model + dims. Vector space consistency check — when write+read "
+        "models differ, include ⚠️ row.",
+        "",
+        "### `evaluation`",
+        "recall@k metrics, hit-rate tracking, golden-set, link to `evaluation/` "
+        "sub-module if present. When absent: `> [!warning] 無 retrieve eval`.",
+        "",
+        "### `strengths`",
+        "3-5 tight bullets.",
+        "",
+        "### `weaknesses`",
+        "3-5 tight bullets. Common: vector space mismatch / no eval / no incremental "
+        "update / stale chunks.",
+        "",
+        "### `improvements`",
+        f"3-5 Imps with: {improvement_shape}.",
+        "",
+        "### `dependencies`",
+        "Wikilinks only: each [[ai-flows/<slug>]], [[decisions]] relevant, external lib.",
+        "",
+        "Return strict JSON: {\"summary\": \"...\", \"rag-data-flow\": \"...\", "
+        "\"ingest-pipeline\": \"...\", \"vector-store-config\": \"...\", "
+        "\"retrieve-strategy\": \"...\", \"embedding-providers\": \"...\", "
+        "\"evaluation\": \"...\", \"strengths\": \"...\", \"weaknesses\": \"...\", "
+        "\"improvements\": \"...\", \"dependencies\": \"...\"}.",
+        "",
+        "## AI flows inventory",
+        flows_inventory,
+        "",
+        "## Scanner-detected RAG signals",
+        json.dumps(ai_rag_signals, indent=2, ensure_ascii=False, default=str),
+    ])
+
+
 def build_features_prompt(
     *,
     project: str,
