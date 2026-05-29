@@ -97,3 +97,79 @@ def test_refresh_full_mode_ignores_last_refresh(tmp_path: Path):
     assert any("old commit" in t for t in titles), (
         f"full mode should include pre-last-refresh commits; got {titles}"
     )
+
+
+def test_refresh_classifies_commit_on_main_as_done(tmp_path: Path):
+    proj_dir = tmp_path / "Projects" / "myproject"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "myproject.md").write_text(
+        f"---\nlocal-path: {tmp_path / 'repo'}\n---\n", encoding="utf-8"
+    )
+    (proj_dir / "board.md").write_text(
+        "---\nlast-refresh: 2026-05-01T00:00:00\n---\n\n## 待辦\n- old item\n",
+        encoding="utf-8",
+    )
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _commit(repo, "a.py", "x=1\n", "feat: shipped feature A", "2026-05-15T12:00:00")
+
+    result = refresh_board(project_dir=proj_dir, signals=None, full=False)
+    assert result.status == "ok"
+    assert result.done_count >= 1, f"commit on main should be Done; got {result.done_count}"
+
+
+def test_refresh_classifies_brainstorm_branch_as_in_progress(tmp_path: Path):
+    """Commits visible only on brainstorm/* branches are In Progress."""
+    proj_dir = tmp_path / "Projects" / "myproject"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "myproject.md").write_text(
+        f"---\nlocal-path: {tmp_path / 'repo'}\n---\n", encoding="utf-8"
+    )
+    (proj_dir / "board.md").write_text(
+        "---\nlast-refresh: 2026-05-01T00:00:00\n---\n", encoding="utf-8"
+    )
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _commit(repo, "a.py", "x=1\n", "initial", "2026-05-10T00:00:00")
+    # Make a brainstorm branch with a NEW commit.
+    subprocess.run(
+        ["git", "checkout", "-b", "brainstorm/foo"], cwd=repo, check=True, capture_output=True
+    )
+    _commit(repo, "b.py", "y=2\n", "wip: trying foo", "2026-05-16T00:00:00")
+    subprocess.run(["git", "checkout", "main"], cwd=repo, check=True, capture_output=True)
+
+    result = refresh_board(project_dir=proj_dir, signals=None, full=False)
+    assert result.in_flight_count >= 1, (
+        f"brainstorm/* commit should be In Progress; got {result.in_flight_count}"
+    )
+
+
+def test_refresh_clusters_into_existing_buckets_by_keyword(tmp_path: Path):
+    """Items whose title contains a keyword from existing H2 bucket -> that bucket.
+    Unmatched -> ## Misc / Untriaged.
+    """
+    proj_dir = tmp_path / "Projects" / "myproject"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "myproject.md").write_text(
+        f"---\nlocal-path: {tmp_path / 'repo'}\n---\n", encoding="utf-8"
+    )
+    # Existing buckets: "## Auth" and "## Billing".
+    (proj_dir / "board.md").write_text(
+        "---\nlast-refresh: 2026-05-01T00:00:00\n---\n\n"
+        "## Auth\n- existing auth item\n\n"
+        "## Billing\n- existing billing item\n",
+        encoding="utf-8",
+    )
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _commit(repo, "auth.py", "x=1\n", "fix auth bug", "2026-05-15T00:00:00")
+    _commit(repo, "billing.py", "x=2\n", "add billing feature", "2026-05-15T01:00:00")
+    _commit(repo, "other.py", "x=3\n", "tweak something random", "2026-05-15T02:00:00")
+
+    result = refresh_board(project_dir=proj_dir, signals=None, full=False)
+    assert "Auth" in result.buckets, f"got {result.buckets}"
+    assert "Billing" in result.buckets
+    assert "Misc / Untriaged" in result.buckets

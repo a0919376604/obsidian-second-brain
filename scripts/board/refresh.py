@@ -14,6 +14,8 @@ _FRONTMATTER_LAST_REFRESH_RE = re.compile(
 _FRONTMATTER_LOCAL_PATH_RE = re.compile(
     r'^local-path:\s*"?(?P<path>[^"\n]+)"?\s*$', re.MULTILINE
 )
+_BRAINSTORM_REF_RE = re.compile(r"\brefs/(?:remotes/origin/)?(?:HEAD->\s*)?(?P<ref>\S+)")
+_BUCKET_HEADING_RE = re.compile(r"^##\s+(?P<name>[^\n#].*?)\s*$", re.MULTILINE)
 
 
 @dataclass
@@ -57,16 +59,30 @@ def refresh_board(
     else:
         new_items = _new_items_from_signals(signals)
 
+    done, in_flight, backlog = _classify_items(new_items)
+
+    existing_buckets = _existing_bucket_names(board_text)
+    bucket_assignments = _cluster_items(done + in_flight + backlog, existing_buckets)
+    buckets = sorted(set(bucket_assignments.values()))
+    if "Misc / Untriaged" not in buckets and any(
+        bucket == "Misc / Untriaged" for bucket in bucket_assignments.values()
+    ):
+        buckets.append("Misc / Untriaged")
+
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
     return RefreshResult(
         status="ok",
         project_slug=project_slug,
         board_path=board_path,
+        done_count=len(done),
+        in_flight_count=len(in_flight),
+        backlog_count=len(backlog),
+        buckets=buckets,
         new_items=new_items,
         last_refresh_before=last_refresh_before,
         last_refresh_after=now_iso,
-        message=f"walked {len(new_items)} items",
+        message=f"walked {len(new_items)} items into {len(buckets)} bucket(s)",
     )
 
 
@@ -175,3 +191,79 @@ def _parse_iso_ts(ts: str) -> float | None:
 def _new_items_from_signals(signals: dict) -> list[dict]:
     """Reuse caller-provided signals (architect Phase 7 path). Filled in Task 7."""
     return []
+
+
+def _classify_items(items: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
+    """Return (done, in_flight, backlog) lists."""
+    done: list[dict] = []
+    in_flight: list[dict] = []
+    backlog: list[dict] = []
+    for item in items:
+        kind = item["kind"]
+        if kind == "commit":
+            refs = item.get("refs", "")
+            if _has_brainstorm_ref(refs):
+                in_flight.append(item)
+            elif any(branch in refs for branch in ("main", "master", "trunk")) or refs == "":
+                done.append(item)
+            else:
+                in_flight.append(item)
+        elif kind == "plan":
+            in_flight.append(item)
+        elif kind == "spec":
+            backlog.append(item)
+        else:
+            backlog.append(item)
+    return done, in_flight, backlog
+
+
+def _has_brainstorm_ref(refs: str) -> bool:
+    if "brainstorm/" in refs:
+        return True
+    return any("brainstorm/" in match.group("ref") for match in _BRAINSTORM_REF_RE.finditer(refs))
+
+
+def _existing_bucket_names(board_text: str) -> list[str]:
+    """Extract H2 bucket names from existing board.md, excluding synthesis sections."""
+    synthesis_section_names = {
+        "🔥 This Week",
+        "待辦",
+        "進行中",
+        "已完成",
+        "已完成 (本週)",
+        "Patterns observed",
+        "Bucket summary",
+        "給未來 Claude",
+    }
+    buckets: list[str] = []
+    for match in _BUCKET_HEADING_RE.finditer(board_text):
+        name = match.group("name").strip()
+        if name in synthesis_section_names:
+            continue
+        if any(name.endswith(suffix) for suffix in (" 本週", " (本週)")):
+            continue
+        buckets.append(name)
+    return buckets
+
+
+def _cluster_items(items: list[dict], existing_buckets: list[str]) -> dict[str, str]:
+    """Assign each item to an existing bucket by keyword overlap; else Misc / Untriaged."""
+    assignments: dict[str, str] = {}
+    bucket_keywords = {bucket: set(_tokenize_for_match(bucket)) for bucket in existing_buckets}
+    for item in items:
+        title = item["title"]
+        title_tokens = set(_tokenize_for_match(title))
+        best_bucket = None
+        best_overlap = 0
+        for bucket, keywords in bucket_keywords.items():
+            overlap = len(title_tokens & keywords)
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_bucket = bucket
+        assignments[title] = best_bucket or "Misc / Untriaged"
+    return assignments
+
+
+def _tokenize_for_match(text: str) -> list[str]:
+    """Lower-case word tokens with length >= 3."""
+    return [word for word in re.findall(r"[A-Za-z一-鿿]+", text.lower()) if len(word) >= 3]
