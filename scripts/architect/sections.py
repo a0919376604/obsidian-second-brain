@@ -638,6 +638,82 @@ def compose_character_card_note(
     return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
 
 
+def build_world_prompt(
+    *,
+    project: str,
+    layer_evidence: dict,
+    repomix_packed: str,
+    output_lang: str,
+) -> str:
+    if output_lang == "zh-TW":
+        lang_directive = "請以繁體中文撰寫。Code identifier 保持英文。"
+        improvement_shape = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = "Write all prose in English."
+        improvement_shape = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    import json as _json
+    evidence_json = _json.dumps(layer_evidence, indent=2, ensure_ascii=False, default=str)
+
+    return "\n".join([
+        f"You are documenting the **World** layer for AI-companion project `{project}`.",
+        f"Output language: {output_lang}. {lang_directive}",
+        "",
+        "## Critical rules",
+        "1. NO invention.",
+        "2. Wikilink-out cross-layer refs.",
+        "3. Tight bullets for strengths/weaknesses.",
+        "",
+        "## Output: 10 @generated blocks",
+        "",
+        "### `summary` — 1 paragraph (world count, static-vs-mutable, multi-world)",
+        "### `world-schema` — data structure",
+        "### `lore-inventory` — static content index (table or list)",
+        "### `world-state` — mutable fields + persistence store",
+        "### `loading-strategy` — when loaded into LLM context, cache, token budget",
+        "### `mutation-rules` — who mutates, when, conflict resolution",
+        "### `strengths` — 3-5 tight bullets",
+        "### `weaknesses` — 3-5 (corruption / consistency / token explosion)",
+        f"### `improvements` — 3-5 Imps: {improvement_shape}",
+        "### `dependencies` — wikilinks only",
+        "",
+        "Return strict JSON with all 10 keys.",
+        "",
+        "## Layer evidence",
+        evidence_json,
+        "",
+        "## Repomix-packed module context",
+        repomix_packed[:50000],
+    ])
+
+
+def compose_world_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    world_count: int,
+    mutable: bool,
+) -> str:
+    note = compose_note(
+        section="world", project=project, repo_label=repo_label,
+        commit=commit, signal_sources=signal_sources, confidence=confidence,
+        output_lang=output_lang, generated_blocks=generated_blocks,
+    )
+    extra_fm = (
+        f"layer: world\n"
+        f"depends-on: []\n"
+        f'mutated-by: ["storyline"]\n'
+        f"world-count: {world_count}\n"
+        f"mutable: {str(mutable).lower()}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def _preamble_for(section: str, lang: str) -> str:
     """Short preamble describing the note's purpose to future-Claude."""
     if lang == "zh-TW":

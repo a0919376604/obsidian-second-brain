@@ -161,3 +161,36 @@ def test_compose_character_card_note_emits_extra_frontmatter():
     assert "card-count: 6" in note
     assert "schema-version: v1" in note
     assert "layer: character-card" in note
+
+
+def test_build_world_prompt_requires_10_block_keys():
+    from scripts.architect.sections import build_world_prompt
+    prompt = build_world_prompt(
+        project="ai-eden",
+        layer_evidence={"present": True, "root_paths": ["app/characters/worlds/"],
+                         "artifact_files": [], "confidence": "high"},
+        repomix_packed="", output_lang="zh-TW",
+    )
+    for key in ("summary", "world-schema", "lore-inventory", "world-state",
+                "loading-strategy", "mutation-rules",
+                "strengths", "weaknesses", "improvements", "dependencies"):
+        assert key in prompt
+
+
+def test_compose_world_note_emits_extra_frontmatter():
+    from scripts.architect.sections import compose_world_note
+    blocks = {n: f"body" for n in (
+        "summary", "world-schema", "lore-inventory", "world-state",
+        "loading-strategy", "mutation-rules",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    )}
+    note = compose_world_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["x"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        world_count=1, mutable=True,
+    )
+    assert "world-count: 1" in note
+    assert "mutable: true" in note
+    assert "layer: world" in note
+    assert 'mutated-by: ["storyline"]' in note
