@@ -194,3 +194,35 @@ def test_compose_world_note_emits_extra_frontmatter():
     assert "mutable: true" in note
     assert "layer: world" in note
     assert 'mutated-by: ["storyline"]' in note
+
+
+def test_build_storyline_prompt_requires_11_block_keys():
+    from scripts.architect.sections import build_storyline_prompt
+    prompt = build_storyline_prompt(
+        project="ai-eden",
+        layer_evidence={"present": True, "root_paths": [], "artifact_files": [],
+                         "storyline_dsl_file": "storyline_dsl.py", "confidence": "high"},
+        repomix_packed="", output_lang="zh-TW",
+    )
+    for key in ("summary", "storyline-dsl", "state-machine", "progression-rules",
+                "branching-logic", "persistence", "authoring-workflow",
+                "strengths", "weaknesses", "improvements", "dependencies"):
+        assert key in prompt
+
+
+def test_compose_storyline_note_emits_extra_frontmatter():
+    from scripts.architect.sections import compose_storyline_note
+    blocks = {n: "body" for n in (
+        "summary", "storyline-dsl", "state-machine", "progression-rules",
+        "branching-logic", "persistence", "authoring-workflow",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    )}
+    note = compose_storyline_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["x"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        dsl_format="ai-eden-storyline-dsl-v1", branch_count=4,
+    )
+    assert "dsl-format: ai-eden-storyline-dsl-v1" in note
+    assert "branch-count: 4" in note
+    assert "layer: storyline" in note

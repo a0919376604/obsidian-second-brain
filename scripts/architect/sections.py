@@ -714,6 +714,85 @@ def compose_world_note(
     return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
 
 
+def build_storyline_prompt(
+    *,
+    project: str,
+    layer_evidence: dict,
+    repomix_packed: str,
+    output_lang: str,
+) -> str:
+    if output_lang == "zh-TW":
+        lang_directive = "請以繁體中文撰寫。Code identifier 保持英文。"
+        improvement_shape = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = "Write all prose in English."
+        improvement_shape = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    import json as _json
+    evidence_json = _json.dumps(layer_evidence, indent=2, ensure_ascii=False, default=str)
+
+    return "\n".join([
+        f"You are documenting the **Storyline** layer for AI-companion project `{project}`.",
+        f"Output language: {output_lang}. {lang_directive}",
+        "",
+        "## Critical rules",
+        "1. NO invention.",
+        "2. Wikilink-out cross-layer refs.",
+        "3. Mermaid state diagram in `state-machine` block when applicable.",
+        "",
+        "## Output: 11 @generated blocks",
+        "",
+        "### `summary` — DSL shape, storyline count, branching, state",
+        "### `storyline-dsl` — Grammar + example code block",
+        "### `state-machine` — States / transitions / triggers; Mermaid state diagram",
+        "### `progression-rules` — When beats advance (intimacy gate / event / time)",
+        "### `branching-logic` — Choice points / decision trees / user-input vs LLM",
+        "### `persistence` — Storyline state store, cross-session continuity",
+        "### `authoring-workflow` — Creator workflow, edit-reload, testing",
+        "### `strengths` — 3-5 tight bullets",
+        "### `weaknesses` — 3-5 (DSL escape / state drift / authoring barrier)",
+        f"### `improvements` — 3-5 Imps: {improvement_shape}",
+        "### `dependencies` — wikilinks only",
+        "",
+        "Return strict JSON with all 11 keys.",
+        "",
+        "## Layer evidence",
+        evidence_json,
+        "",
+        "## Repomix-packed module context",
+        repomix_packed[:50000],
+    ])
+
+
+def compose_storyline_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    dsl_format: str | None,
+    branch_count: int | None,
+) -> str:
+    note = compose_note(
+        section="storyline", project=project, repo_label=repo_label,
+        commit=commit, signal_sources=signal_sources, confidence=confidence,
+        output_lang=output_lang, generated_blocks=generated_blocks,
+    )
+    dsl_value = dsl_format if dsl_format else "none"
+    branch_value = "null" if branch_count is None else str(branch_count)
+    extra_fm = (
+        f"layer: storyline\n"
+        f'depends-on: ["character-card", "world"]\n'
+        f'mutated-by: ["memory"]\n'
+        f"dsl-format: {dsl_value}\n"
+        f"branch-count: {branch_value}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def _preamble_for(section: str, lang: str) -> str:
     """Short preamble describing the note's purpose to future-Claude."""
     if lang == "zh-TW":
