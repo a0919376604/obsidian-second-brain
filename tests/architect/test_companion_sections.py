@@ -127,3 +127,37 @@ def test_scan_report_ai_companion_none_when_no_signals(tmp_path):
     report = build_scan_report(tmp_path, vault_project_dir=None)
     assert "ai_companion" in report
     assert report["ai_companion"]["archetype"] == "none"
+
+
+def test_build_character_card_prompt_requires_9_block_keys():
+    from scripts.architect.sections import build_character_card_prompt
+    prompt = build_character_card_prompt(
+        project="ai-eden",
+        layer_evidence={"present": True, "root_paths": ["app/characters/"],
+                         "artifact_files": ["app/characters/schema.py"],
+                         "confidence": "high"},
+        repomix_packed="<files>...</files>",
+        output_lang="zh-TW",
+    )
+    for key in ("summary", "card-schema", "definitions-inventory",
+                "prompt-template-binding", "versioning-and-overrides",
+                "strengths", "weaknesses", "improvements", "dependencies"):
+        assert key in prompt
+
+
+def test_compose_character_card_note_emits_extra_frontmatter():
+    from scripts.architect.sections import compose_character_card_note
+    blocks = {n: f"body for {n}" for n in (
+        "summary", "card-schema", "definitions-inventory",
+        "prompt-template-binding", "versioning-and-overrides",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    )}
+    note = compose_character_card_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["scan: ai_companion"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        card_count=6, schema_version="v1",
+    )
+    assert "card-count: 6" in note
+    assert "schema-version: v1" in note
+    assert "layer: character-card" in note

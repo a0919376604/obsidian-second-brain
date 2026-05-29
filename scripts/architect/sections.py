@@ -555,6 +555,89 @@ def compose_ai_rag_note(
     return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
 
 
+def build_character_card_prompt(
+    *,
+    project: str,
+    layer_evidence: dict,
+    repomix_packed: str,
+    output_lang: str,
+) -> str:
+    """v4.6 character-card layer synthesis prompt. Demands 9 strict-JSON blocks."""
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫散文。Code identifier / 檔案路徑 / "
+            "function name / env var / wikilink 檔名段保持英文。"
+        )
+        improvement_shape = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = "Write all prose in English. Code identifiers stay verbatim."
+        improvement_shape = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    import json as _json
+    evidence_json = _json.dumps(layer_evidence, indent=2, ensure_ascii=False, default=str)
+
+    return "\n".join([
+        f"You are documenting the **Character Card** layer for AI-companion project `{project}`.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. NO invention. Empty signal → acknowledge absence.",
+        "2. Wikilink-out cross-layer references — use [[ai-flows/world#World state]] etc.",
+        "3. Tight bullet shape for strengths/weaknesses: **Title (≤30 char).** clarification (≤80 char).",
+        "4. Full prompt body in collapsible callout `> [!quote]-` when system prompt detected.",
+        "",
+        "## Output: 9 @generated blocks (JSON keys)",
+        "",
+        "### `summary` — 1 paragraph (card count, format, customization model)",
+        "### `card-schema` — data structure + validation rules, cite `code:path:line`",
+        "### `definitions-inventory` — markdown table: Name | Source | Key traits | Active",
+        "### `prompt-template-binding` — how card → system prompt; variables; full prompt callout",
+        "### `versioning-and-overrides` — schema evolution + user-customization paths",
+        f"### `strengths` — 3-5 tight bullets",
+        f"### `weaknesses` — 3-5 tight bullets + failure modes",
+        f"### `improvements` — 3-5 Imps: {improvement_shape}",
+        "### `dependencies` — wikilinks only",
+        "",
+        "Return strict JSON: {\"summary\": \"...\", \"card-schema\": \"...\", ...all 9 keys...}.",
+        "",
+        "## Layer evidence (scanner signals)",
+        evidence_json,
+        "",
+        "## Repomix-packed module context",
+        repomix_packed[:50000],
+    ])
+
+
+def compose_character_card_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    card_count: int,
+    schema_version: str | None,
+) -> str:
+    """Wrap compose_note(section='character-card', ...) + merge frontmatter."""
+    note = compose_note(
+        section="character-card", project=project, repo_label=repo_label,
+        commit=commit, signal_sources=signal_sources, confidence=confidence,
+        output_lang=output_lang, generated_blocks=generated_blocks,
+    )
+    sv = schema_version if schema_version else "unknown"
+    extra_fm = (
+        f"layer: character-card\n"
+        f'depends-on: ["world", "storyline"]\n'
+        f"mutated-by: []\n"
+        f"card-count: {card_count}\n"
+        f"schema-version: {sv}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def _preamble_for(section: str, lang: str) -> str:
     """Short preamble describing the note's purpose to future-Claude."""
     if lang == "zh-TW":
