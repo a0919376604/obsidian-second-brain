@@ -53,6 +53,11 @@ SECTION_TYPES = {
     "ai-rag": "architecture-ai-rag",
     # v4.4 — brainstorm (project-level interview)
     "brainstorm": "project-brainstorm",
+    # v4.6 — AI companion archetype (4-layer schema)
+    "character-card": "architecture-character-card",
+    "world": "architecture-world",
+    "storyline": "architecture-storyline",
+    "companion-overview": "architecture-companion-overview",
 }
 
 
@@ -234,6 +239,27 @@ _BLOCK_NAMES = {
         "meta-reflection",
         "dependencies",
     ),
+    # v4.6 — AI companion archetype
+    "character-card": (
+        "summary", "card-schema", "definitions-inventory",
+        "prompt-template-binding", "versioning-and-overrides",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    ),
+    "world": (
+        "summary", "world-schema", "lore-inventory", "world-state",
+        "loading-strategy", "mutation-rules",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    ),
+    "storyline": (
+        "summary", "storyline-dsl", "state-machine", "progression-rules",
+        "branching-logic", "persistence", "authoring-workflow",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    ),
+    "companion-overview": (
+        "summary", "four-layer-diagram", "data-flow", "bind-points",
+        "layer-maturity-table",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    ),
 }
 
 # v4 — these sections are still callable for backward compat but no longer
@@ -320,6 +346,29 @@ _BLOCK_HEADINGS = {
     "parked": "## Parked",
     "open-questions": "## Open questions",
     "meta-reflection": "## Meta reflection",
+    # v4.6 character-card block headings
+    "card-schema": "## Card schema",
+    "definitions-inventory": "## Definitions inventory",
+    "prompt-template-binding": "## Prompt template binding",
+    "versioning-and-overrides": "## Versioning & overrides",
+    # v4.6 world block headings
+    "world-schema": "## World schema",
+    "lore-inventory": "## Lore inventory",
+    "world-state": "## Mutable world state",
+    "loading-strategy": "## Loading strategy",
+    "mutation-rules": "## Mutation rules",
+    # v4.6 storyline block headings
+    "storyline-dsl": "## Storyline DSL",
+    "state-machine": "## State machine",
+    "progression-rules": "## Progression rules",
+    "branching-logic": "## Branching logic",
+    "persistence": "## Persistence",
+    "authoring-workflow": "## Authoring workflow",
+    # v4.6 companion-overview block headings
+    "four-layer-diagram": "## Four-layer dependency diagram",
+    "data-flow": "## Per-turn data flow",
+    "bind-points": "## Bind points",
+    "layer-maturity-table": "## Layer maturity table",
 }
 
 
@@ -523,6 +572,10 @@ def _preamble_for(section: str, lang: str) -> str:
             "ai-memory": "本檔是 AI 記憶層的跨流程深判斷 — lifecycle、TTL、compaction、context window 管理。Per-flow state shape 請見 [[Architecture/ai-flows/<slug>#State schema]]。",
             "ai-rag": "本檔是 RAG (retrieval-augmented generation) 跨流程管線深判斷 — ingest → vector store → retrieve、embedding 對齊、評估。Per-flow LLM 設定請見 [[Architecture/ai-flows/<slug>#LLM config]]。",
             "brainstorm": "本檔是 `/obsidian-brainstorm` session 輸出 — Claude 採訪式 brainstorm,從 vault 全部 project 素材出發,丟出大膽推測 (provocations),引導使用者反應與深挖,蒸餾成 ImprovementItem 與待驗證假設。被 `/obsidian-roadmap` 自動撿走進 backlog。",
+            "character-card": "本檔是 AI 陪伴專案的 Character Card 層深判斷 — 角色定義、prompt template 綁定、versioning。跨層議題見 [[Architecture/ai-flows/companion-overview]]。",
+            "world": "本檔是 AI 陪伴專案的 World 層深判斷 — lore inventory、mutable state、loading strategy、mutation rules。跨層議題見 [[Architecture/ai-flows/companion-overview]]。",
+            "storyline": "本檔是 AI 陪伴專案的 Storyline 層深判斷 — DSL grammar、state machine、progression rules、branching、persistence、authoring workflow。",
+            "companion-overview": "本檔是 AI 陪伴 archetype 的跨 4 層 cross-cutting 報告 — 依賴圖、每輪資料流、層間綁定、各層成熟度。Per-layer 詳細請見 [[ai-flows/character-card]] / [[ai-flows/world]] / [[ai-flows/storyline]] / [[ai-flows/memory]]。",
         }[section]
     return {
         "api-surface": "This is the API surface reference. Look up commands or endpoints here.",
@@ -538,6 +591,10 @@ def _preamble_for(section: str, lang: str) -> str:
         "ai-memory": "Cross-flow AI memory lens — lifecycle, TTL, compaction, context window management. For per-flow state shape see [[Architecture/ai-flows/<slug>#State schema]].",
         "ai-rag": "Cross-flow RAG (retrieval-augmented generation) lens — ingest → vector store → retrieve, embedding alignment, evaluation. For per-flow LLM config see [[Architecture/ai-flows/<slug>#LLM config]].",
         "brainstorm": "Output of an `/obsidian-brainstorm` session — Claude interviews the user, starts from vault project materials, throws bold next-direction provocations, drills via follow-ups, and distills ImprovementItems plus hypotheses-to-validate. Picked up by `/obsidian-roadmap` automatically.",
+        "character-card": "Character Card layer deep dive for an AI companion project — character definitions, prompt template binding, versioning. Cross-layer concerns: [[Architecture/ai-flows/companion-overview]].",
+        "world": "World layer deep dive — lore inventory, mutable world state, loading strategy, mutation rules. Cross-layer concerns: [[Architecture/ai-flows/companion-overview]].",
+        "storyline": "Storyline layer deep dive — DSL grammar, state machine, progression rules, branching, persistence, authoring workflow.",
+        "companion-overview": "Cross-cutting report for the AI companion archetype — 4-layer dependency diagram, per-turn data flow, bind points, layer maturity. For per-layer detail see [[ai-flows/character-card]] / [[ai-flows/world]] / [[ai-flows/storyline]] / [[ai-flows/memory]].",
     }[section]
 
 
