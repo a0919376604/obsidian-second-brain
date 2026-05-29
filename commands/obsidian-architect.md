@@ -54,6 +54,10 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
 - `--no-board-refresh` - skip Phase 7 (board refresh). Default OFF (board.md
   auto-refreshes when present).
 
+**v4.6-specific flags:**
+- `--no-companion` — even when archetype=ai-companion is detected, skip Phase 3.7.5 (companion synthesis). Default OFF.
+- `--companion-only` — diagnostic: run Phase 1 + Phase 3.7.5 only. Useful for iterating on companion prompts.
+
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
 
@@ -400,6 +404,103 @@ For each AI flow in `scan_report["ai_flows"]` (skip if `--no-ai-flows`):
      module `backend` (paths `["backend/"]`).
    - For flows that don't match any module's `paths`, skip the link (the
      `ai-flows/` note still exists, just no module-side back-pointer).
+
+## Phase 3.7.5: AI companion archetype synthesis (v4.6)
+
+Skip if `--no-companion` is passed.
+
+Skip if `scan_report["ai_companion"]["archetype"] == "none"`.
+
+For each layer in `["character-card", "world", "storyline"]`:
+
+1. Skip if lockfile `ai_companion.layers[<layer>].signal-hash` matches current signal AND `Architecture/ai-flows/<layer>.md` exists (refresh logic).
+
+2. Run repomix on the layer's `root_paths`:
+   ```bash
+   repomix --include "<root_paths>" --style xml --compress -o /tmp/repomix-companion-<layer>.xml
+   ```
+
+3. Build prompt:
+   ```python
+   from scripts.architect.sections import build_character_card_prompt, build_world_prompt, build_storyline_prompt
+   builder = {"character-card": build_character_card_prompt,
+              "world": build_world_prompt,
+              "storyline": build_storyline_prompt}[layer]
+   prompt = builder(
+       project=project_name,
+       layer_evidence=scan_report["ai_companion"]["layers"][layer],
+       repomix_packed=open(f"/tmp/repomix-companion-{layer}.xml").read(),
+       output_lang=output_lang,
+   )
+   ```
+
+4. Invoke LLM. Expect strict JSON: 9 / 10 / 11 block keys per layer.
+
+5. Compose + write:
+   ```python
+   from scripts.architect.sections import compose_character_card_note, compose_world_note, compose_storyline_note
+
+   if layer == "character-card":
+       note = compose_character_card_note(
+           project=project_name, repo_label=repo_label, commit=commit,
+           signal_sources=signal_sources, confidence=layer_confidence,
+           output_lang=output_lang, generated_blocks=llm_output,
+           card_count=<count from evidence.artifact_files>,
+           schema_version="v1",  # extract from frontmatter or default
+       )
+   # similar for world and storyline (different extra-fm kwargs)
+   ```
+
+6. Write to `Projects/<P>/Architecture/ai-flows/<layer>.md`.
+
+After 3 per-layer files complete, build companion-overview:
+
+1. Collect per-layer summaries (just-written `summary` block bodies).
+
+2. Build prompt:
+   ```python
+   from scripts.architect.sections import build_companion_overview_prompt
+   prompt = build_companion_overview_prompt(
+       project=project_name,
+       ai_companion_signals=scan_report["ai_companion"],
+       layer_summaries=collected_summaries,
+       repomix_packed=high_level_repomix,
+       output_lang=output_lang,
+   )
+   ```
+
+3. Invoke LLM. Expect 9 keys.
+
+4. Compose + write to `Projects/<P>/Architecture/ai-flows/companion-overview.md`:
+   ```python
+   from scripts.architect.sections import compose_companion_overview_note
+   layers_stable = sum(1 for ev in layers.values() if ev["confidence"] == "high")
+   layers_wip = sum(1 for ev in layers.values() if ev["confidence"] == "medium")
+   layers_missing = sum(1 for ev in layers.values() if ev["confidence"] == "speculation" or not ev["present"])
+   note = compose_companion_overview_note(
+       ..., layers_stable=layers_stable, layers_wip=layers_wip,
+       layers_missing=layers_missing,
+   )
+   ```
+
+5. Update lockfile `ai_companion` slot:
+   ```python
+   lockfile.ai_companion = {
+       "archetype": scan_report["ai_companion"]["archetype"],
+       "confidence": scan_report["ai_companion"]["confidence"],
+       "layers": {
+           layer: {"signal-hash": sig_hash, "lang": output_lang,
+                   "last-generated": today_iso, "commit": commit, ...layer-specific...}
+           for layer in ("character-card", "world", "storyline", "companion-overview")
+       },
+   }
+   ```
+
+6. Hub block + overview drill-down (idempotent, sentinel-aware):
+   - Hub `Projects/<P>/<P>.md` `## 架構` block: add line `- AI 陪伴 4 層深判斷 (v4.6): [[Architecture/ai-flows/companion-overview]] | [[Architecture/ai-flows/character-card]] | [[Architecture/ai-flows/world]] | [[Architecture/ai-flows/storyline]]`
+   - `overview.md ## 想深讀的入口`: add line `- **AI 陪伴 4 層深判斷:** [[ai-flows/companion-overview]] (4-layer dep + data flow) | per-layer: [[ai-flows/character-card]] | [[ai-flows/world]] | [[ai-flows/storyline]]`
+
+If `--companion-only`: skip all other Phases (3, 3.5, 3.5.5, 3.7, 3.8, 3.9, 4, 7); only Phase 1 + 3.7.5 + lockfile + hub-update run.
 
 ## Phase 3.8: AI memory synthesis (v4.3)
 
