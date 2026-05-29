@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (architect + board merge)
+
+- `/obsidian-architect <repo>` now auto-refreshes `Projects/<P>/board.md`
+  as Phase 7 (after Architecture/* notes + hub block + activity log).
+  Opt-out via `--no-board-refresh`. Activity log line is combined:
+  `architect+board | <P> ... + board (<done> done, ...)`.
+- `/obsidian-board <repo> --refresh` body now imports the shared helper
+  `scripts.board.refresh.refresh_board()` instead of inline logic.
+  External behavior unchanged; cron path unaffected.
+
+### Added
+
+- `scripts/board/refresh.py` — shared `refresh_board(project_dir,
+  signals=None, full=False)` helper. Walks git log + spec/plan files
+  when signals=None (cron path), reuses caller-provided signals dict
+  when called from architect. Returns `RefreshResult` dataclass with
+  counts + buckets + new items + last-refresh timestamps + message.
+- 8 unit tests in `tests/board/test_refresh.py` covering skipped-when-
+  no-board / signals-None walks / classification heuristic / bucket
+  clustering / signals-provided reuse / frontmatter last-refresh update
+  / full mode.
+
 ### Changed (CLI family alignment)
 
 - 5 commands now share `<repo>` first-positional grammar via the new

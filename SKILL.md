@@ -342,7 +342,7 @@ These slash commands can be used in any Claude surface. Each one is smart — it
 
 | Command | What it does |
 |---|---|
-| `/obsidian-architect <repo>` | Scan codebase + generate v4 architecture report + AI flows + features lens + memory/RAG cross-flow (v4.3 family) |
+| `/obsidian-architect <repo>` | Scan codebase + generate v4 architecture report + AI flows + features lens + memory/RAG cross-flow (v4.3 family) (v4.5: also auto-refreshes Projects/<P>/board.md as Phase 7, opt-out via --no-board-refresh) |
 | `/obsidian-brainstorm <repo>` | Interview-style brainstorm — 4-6 provocations, drill via follow-ups, distill into Brainstorms/ session file |
 | `/obsidian-roadmap <repo>` | Synthesize Architecture + Research + Brainstorms signals into Roadmap.md + T-NNN tasks |
 | `/obsidian-research <repo> <topic>` | Free-source web + academic research (use `global` as `<repo>` for vault-wide) |
