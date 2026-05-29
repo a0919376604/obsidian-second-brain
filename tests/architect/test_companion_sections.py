@@ -70,3 +70,60 @@ def test_v4_6_new_block_headings_registered():
     ]
     for block in new_blocks:
         assert block in _BLOCK_HEADINGS, f"missing heading for {block}"
+
+
+def test_scan_report_includes_ai_companion_key(tmp_path):
+    """build_scan_report exposes ai_companion key when archetype detected."""
+    import subprocess
+    import os
+    from scripts.architect.scan import build_scan_report
+
+    # Minimal git repo so scanner doesn't crash on git metadata.
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("r\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("a\n", encoding="utf-8")
+    chars = tmp_path / "characters"
+    chars.mkdir()
+    (chars / "alice.json").write_text('{"name":"Alice"}', encoding="utf-8")
+    (tmp_path / "storyline.py").write_text(
+        "# storyline beat / progression\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=tmp_path, check=True, capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_DATE": "2026-05-29T00:00:00",
+             "GIT_COMMITTER_DATE": "2026-05-29T00:00:00"},
+    )
+
+    report = build_scan_report(tmp_path, vault_project_dir=None)
+    assert "ai_companion" in report
+    assert report["ai_companion"]["archetype"] == "ai-companion"
+    assert report["ai_companion"]["layers"]["character-card"]["present"] is True
+
+
+def test_scan_report_ai_companion_none_when_no_signals(tmp_path):
+    """No character/storyline → archetype=none, key still present."""
+    import subprocess
+    import os
+    from scripts.architect.scan import build_scan_report
+
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("r\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("a\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("def hello(): pass\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=tmp_path, check=True, capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_DATE": "2026-05-29T00:00:00",
+             "GIT_COMMITTER_DATE": "2026-05-29T00:00:00"},
+    )
+
+    report = build_scan_report(tmp_path, vault_project_dir=None)
+    assert "ai_companion" in report
+    assert report["ai_companion"]["archetype"] == "none"

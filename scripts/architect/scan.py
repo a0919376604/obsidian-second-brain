@@ -108,6 +108,33 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
     ai_memory_data = detect_memory(repo_root, ai_flow_records)
     ai_rag_data = detect_rag(repo_root, ai_flow_records)
 
+    # v4.6 — AI companion archetype detection
+    from scripts.architect.companion_detect import detect_companion_archetype
+
+    hub_frontmatter = None
+    if vault_project_dir is not None:
+        # Try to read project hub frontmatter for archetype override.
+        slug = vault_project_dir.name
+        hub_path = vault_project_dir / f"{slug}.md"
+        if hub_path.is_file():
+            try:
+                text = hub_path.read_text(encoding="utf-8")
+                import re
+                fm_match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
+                if fm_match:
+                    hub_frontmatter = {}
+                    for line in fm_match.group(1).splitlines():
+                        if ":" in line:
+                            k, _, v = line.partition(":")
+                            hub_frontmatter[k.strip()] = v.strip().strip('"').strip("'")
+            except (OSError, UnicodeDecodeError):
+                pass
+
+    companion = detect_companion_archetype(
+        repo_root=repo_root,
+        hub_frontmatter=hub_frontmatter,
+    )
+
     scan_report = {
         "files": files,
         "languages": languages,
@@ -128,6 +155,15 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
         # v4.3 — cross-flow lenses.
         "ai_memory": ai_memory_data,
         "ai_rag": ai_rag_data,
+        "ai_companion": {
+            "archetype": companion.archetype,
+            "confidence": companion.confidence,
+            "triggers": companion.triggers,
+            "layers": {
+                layer_name: asdict(layer_ev)
+                for layer_name, layer_ev in companion.layers.items()
+            },
+        },
     }
     _add_features_inputs(scan_report, repo_root, vault_project_dir)
 
