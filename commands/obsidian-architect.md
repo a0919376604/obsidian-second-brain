@@ -50,6 +50,10 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
   the memory prompt.
 - `--ai-rag-only` - same shape for Phase 3.9.
 
+**Board-refresh flag (v4.5):**
+- `--no-board-refresh` - skip Phase 7 (board refresh). Default OFF (board.md
+  auto-refreshes when present).
+
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
 
@@ -621,9 +625,115 @@ The legacy v3 wikilinks to `future.md` / `roadmap.md` / `jobs.md` /
 `api-surface.md` / `features.md` / `flows.md` MUST be removed from the
 hub block — those vault files no longer exist post-migration.
 
+## Phase 7: Board refresh (auto, v4.5)
+
+Skip if `--no-board-refresh` was passed.
+
+Skip if `Projects/<project_slug>/board.md` doesn't exist (log line:
+"no board.md - skipping board refresh, run /obsidian-project <P> to bootstrap").
+
+1. Assemble signals from already-collected Phase 1 data:
+
+```python
+import re
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+# last-refresh from board.md frontmatter (may be None on first run)
+board_path = project_dir / "board.md"
+board_text = board_path.read_text(encoding="utf-8")
+m = re.search(r'^last-refresh:\s*"?([^"\n]+)"?\s*$', board_text, re.MULTILINE)
+last_refresh_iso = m.group(1).strip() if m else None
+
+# Walk git log since last refresh (or full if missing).
+cmd = [
+    "git",
+    "log",
+    "--all",
+    "--pretty=format:%H%x09%ad%x09%s%x09%D",
+    "--date=iso-strict",
+]
+if last_refresh_iso:
+    cmd.append(f"--since={last_refresh_iso}")
+proc = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True)
+git_commits = []
+for line in proc.stdout.splitlines():
+    parts = line.split("\t")
+    if len(parts) >= 3:
+        sha, when, subject = parts[0], parts[1], parts[2]
+        refs = parts[3] if len(parts) > 3 else ""
+        git_commits.append(
+            {
+                "title": subject,
+                "kind": "commit",
+                "when": when,
+                "source": f"commit {sha[:8]}",
+                "refs": refs,
+            }
+        )
+
+# Walk spec/plan files mtime-filtered.
+docs = repo_root / "docs" / "superpowers"
+spec_files = []
+plan_files = []
+cutoff = None
+if last_refresh_iso:
+    try:
+        cutoff = datetime.fromisoformat(last_refresh_iso.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        cutoff = None
+for sub, dest in (("specs", spec_files), ("plans", plan_files)):
+    d = docs / sub
+    if d.is_dir():
+        for f in sorted(d.glob("*.md")):
+            if cutoff is None or f.stat().st_mtime >= cutoff:
+                dest.append(f)
+
+signals = {
+    "git_commits": git_commits,
+    "spec_files": spec_files,
+    "plan_files": plan_files,
+}
+```
+
+2. Call helper with failure isolation:
+
+```python
+from scripts.board.refresh import refresh_board
+
+try:
+    refresh_result = refresh_board(
+        project_dir=project_dir,
+        signals=signals,
+        full=False,
+    )
+except Exception as e:
+    refresh_result = None
+    print(f"board refresh failed: {e}; architect itself succeeded")
+```
+
+3. Use `refresh_result` in the next phase (Daily and operation log) to merge
+   into a single combined activity log line:
+
+   - If `refresh_result` is not None and `refresh_result.status == "ok"`:
+     ```
+     **HH:MM** - architect+board | <P> @ commit <sha> - <module-summary> + board (<done> done, <in-flight> in-flight, <backlog> backlog across <N> buckets)
+     ```
+   - If `refresh_result` is None or `status` != `"ok"`:
+     ```
+     **HH:MM** - architect | <P> @ commit <sha> - <module-summary> | board: <skipped/error message>
+     ```
+
+4. The architect's overall exit status is unaffected - architecture/* is the
+   primary deliverable; Phase 7 failure is logged but non-blocking.
+
 ## Daily and operation log
 
-- If `Logs/` exists: append `**HH:MM** - architect | <P> - N modules (M new, K updated, L deprecated)` to `Logs/YYYY-MM-DD.md`.
+- If `Logs/` exists: append a single combined activity line to
+  `Logs/YYYY-MM-DD.md ## Activity`. Format depends on Phase 7 outcome:
+  - When Phase 7 succeeded: `**HH:MM** - architect+board | <P> @ commit <sha> - N modules (M new, K updated, L deprecated) + board (<done> done, <in-flight> in-flight, <backlog> backlog across <N> buckets)`
+  - When Phase 7 was skipped or failed: `**HH:MM** - architect | <P> @ commit <sha> - N modules (M new, K updated, L deprecated) | board: <skipped/error message>`
 - Otherwise append `## [YYYY-MM-DD] architect | <P> - N modules ...` to `log.md`.
 - Append to today's daily note `## Activity` section: `- /obsidian-architect: scanned [[<P>]] @ commit <commit>`.
 
