@@ -1017,6 +1017,118 @@ def build_ai_flow_prompt(
     ])
 
 
+def build_ai_memory_prompt(
+    *,
+    project: str,
+    ai_memory_signals: dict,
+    ai_flows_summary: list[dict],
+    output_lang: str,
+) -> str:
+    """v4.3 — AI memory cross-flow synthesis prompt.
+
+    Demands the LLM produce 11 @generated block bodies. Critical rule:
+    NO invention — when scanner signals are empty/null/false, the prose
+    MUST acknowledge absence rather than hallucinate. Per-flow detail
+    must wikilink out to [[ai-flows/<slug>#State schema]] rather than
+    rehash.
+    """
+    if output_lang == "zh-TW":
+        lang_directive = (
+            "請以繁體中文 (zh-TW) 撰寫所有散文。"
+            "Code identifier (檔案路徑、變數名、函式名、env var)、class name、"
+            "model 字串保持英文/原文。"
+        )
+        absence_label = "未偵測到"
+        improvement_shape = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = (
+            "Write all prose in English. Code identifiers, paths, function names, "
+            "env vars, class names, and model strings stay verbatim."
+        )
+        absence_label = "(not detected)"
+        improvement_shape = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    flows_inventory = "\n".join(
+        f"  - {f['slug']} ({f['framework']}, {f['root_path']})"
+        for f in ai_flows_summary
+    ) or "  (no AI flows)"
+
+    return "\n".join([
+        f"You are documenting the **cross-flow AI memory lens** for project `{project}`.",
+        f"Output language: {output_lang}.",
+        lang_directive,
+        "",
+        "## Critical rules",
+        "1. NO invention. When a scanner field below is empty/null/false, the prose "
+        f"MUST acknowledge absence verbatim (e.g. '{absence_label} TTL policy'). "
+        "Hallucinated TTLs / eviction rules are worse than acknowledged unknowns.",
+        "2. Per-flow detail MUST wikilink out — DO NOT rewrite state shape. Use "
+        "`[[ai-flows/<slug>#State schema]]` from the flow-memory-map table.",
+        "3. strengths / weaknesses use the v3.1 tight bullet shape: "
+        "**Title (≤30 char).** clarification (≤80 char).",
+        "4. Improvements must follow ImprovementItem shape with Evidence as wikilink "
+        "or path:line.",
+        "",
+        "## Output: produce 11 @generated blocks (JSON keys)",
+        "",
+        "### `summary`",
+        "1 paragraph. Which flows have memory (wikilinks), which are stateless, "
+        "backend in one line, policy one line.",
+        "",
+        "### `flow-memory-map`",
+        "Markdown table: | Flow | Has memory | Backend | Scope | Persistence | "
+        "Wikilink to [[ai-flows/<slug>#State schema]] |.",
+        "",
+        "### `backend-and-storage`",
+        "Backend per flow (Redis / Postgres / file / in-memory), serializer, "
+        "key pattern, encryption-at-rest, backup policy. Each fact must cite "
+        "`code:path:line` from scanner.",
+        "",
+        "### `scope-and-lifecycle`",
+        "session-scoped vs user-scoped vs request-scoped. Creation/destruction "
+        "trigger. Orphan cleanup job (exists? where?). TTL & eviction — when "
+        "undetected, state plainly 'no TTL / eviction policy detected'.",
+        "",
+        "### `context-window-management`",
+        "Reducer pattern, max-tokens, truncation, fallback when exceeded.",
+        "",
+        "### `compaction-strategy`",
+        "When summarizer triggers; wikilink to `[[ai-flows/<slug>#Prompts]]`; "
+        "frequency; storage path.",
+        "",
+        "### `long-term-vs-short`",
+        "Resumable session state vs cross-session knowledge. When NO long-term "
+        "memory exists, plainly state so.",
+        "",
+        "### `strengths`",
+        "3-5 tight bullets.",
+        "",
+        "### `weaknesses`",
+        "3-5 tight bullets. Failure modes: unbounded growth / race conditions / "
+        "serializer drift / cross-worker inconsistency / silent eviction.",
+        "",
+        "### `improvements`",
+        f"3-5 Imps with: {improvement_shape}.",
+        "",
+        "### `dependencies`",
+        "Wikilinks only: each [[ai-flows/<slug>]], [[decisions]] relevant ADR, "
+        "external lib references.",
+        "",
+        "Return strict JSON: {\"summary\": \"...\", \"flow-memory-map\": \"...\", "
+        "\"backend-and-storage\": \"...\", \"scope-and-lifecycle\": \"...\", "
+        "\"context-window-management\": \"...\", \"compaction-strategy\": \"...\", "
+        "\"long-term-vs-short\": \"...\", \"strengths\": \"...\", "
+        "\"weaknesses\": \"...\", \"improvements\": \"...\", "
+        "\"dependencies\": \"...\"}.",
+        "",
+        "## AI flows inventory",
+        flows_inventory,
+        "",
+        "## Scanner-detected memory signals (per-flow + summary)",
+        json.dumps(ai_memory_signals, indent=2, ensure_ascii=False, default=str),
+    ])
+
+
 def build_features_prompt(
     *,
     project: str,
