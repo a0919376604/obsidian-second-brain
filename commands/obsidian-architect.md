@@ -38,6 +38,15 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
   (features synth). Useful for iterating on the features prompt without
   re-running other sections.
 
+**v4.3-specific flags:**
+- `--no-ai-memory` - even when >=1 AI flow is detected, skip Phase 3.8
+  (memory.md). Default OFF (memory.md IS produced when >=1 AI flow is detected).
+- `--no-ai-rag` - same shape; skips Phase 3.9 (rag.md). Default OFF.
+- `--ai-memory-only` - diagnostic: run Phase 1 + 3.7 (per-flow ai-flow notes,
+  needed for cross-link integrity) + Phase 3.8 only. Useful for iterating on
+  the memory prompt.
+- `--ai-rag-only` - same shape for Phase 3.9.
+
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
 
@@ -368,6 +377,153 @@ For each AI flow in `scan_report["ai_flows"]` (skip if `--no-ai-flows`):
      module `backend` (paths `["backend/"]`).
    - For flows that don't match any module's `paths`, skip the link (the
      `ai-flows/` note still exists, just no module-side back-pointer).
+
+## Phase 3.8: AI memory synthesis (v4.3)
+
+Skip if `--no-ai-memory` is passed.
+
+Skip if `scan_report["ai_flows"]` is empty.
+
+Skip if `lockfile.ai_memory.signal-hash` matches the new signal hash AND
+`Projects/<P>/Architecture/ai-flows/memory.md` exists (refresh logic).
+
+1. Compute signal hash:
+   ```python
+   from scripts.architect.sections import signal_hash
+   import hashlib
+   memory_signal = {
+       "ai_memory": scan_report["ai_memory"],
+       "per_flow_state_schema_hash": {
+           f["slug"]: _sha256_block(arch_dir / "ai-flows" / f"{f['slug']}.md",
+                                      "state-schema")
+           for f in scan_report["ai_flows"]
+       },
+   }
+   sig_hash = signal_hash(memory_signal)
+   ```
+
+2. Build prompt:
+   ```python
+   from scripts.architect.sections import build_ai_memory_prompt
+   prompt = build_ai_memory_prompt(
+       project=project_name,
+       ai_memory_signals=scan_report["ai_memory"],
+       ai_flows_summary=[
+           {"slug": f["slug"], "framework": f["framework"],
+            "root_path": f["root_path"]}
+           for f in scan_report["ai_flows"]
+       ],
+       output_lang=output_lang,
+   )
+   ```
+
+3. Invoke the LLM. Expect strict JSON: 11 keys (all markdown strings).
+
+4. Compose:
+   ```python
+   from scripts.architect.sections import compose_ai_memory_note
+   note = compose_ai_memory_note(
+       project=project_name,
+       repo_label=repo_label,
+       commit=commit,
+       signal_sources=["scan: ai_memory",
+                        f"ai-flows: {', '.join(f['slug'] for f in scan_report['ai_flows'])}",
+                        "manifest: modules"],
+       confidence="high" if scan_report["ai_memory"]["summary"]["memory_flows"] > 0 else "medium",
+       output_lang=output_lang,
+       generated_blocks=llm_output,
+       memory_flows=scan_report["ai_memory"]["summary"]["memory_flows"],
+       stateless_flows=scan_report["ai_memory"]["summary"]["stateless_flows"],
+       backend=scan_report["ai_memory"]["summary"]["primary_backend"],
+   )
+   ```
+
+5. Write to `Projects/<P>/Architecture/ai-flows/memory.md`.
+
+6. Update lockfile `ai_memory`:
+   ```python
+   lockfile.ai_memory = {
+       "signal-hash": sig_hash,
+       "lang": output_lang,
+       "last-generated": today_iso,
+       "commit": commit,
+       "memory_flows": scan_report["ai_memory"]["summary"]["memory_flows"],
+       "stateless_flows": scan_report["ai_memory"]["summary"]["stateless_flows"],
+       "backend": scan_report["ai_memory"]["summary"]["primary_backend"],
+   }
+   ```
+
+## Phase 3.9: AI RAG synthesis (v4.3)
+
+Skip if `--no-ai-rag` is passed.
+
+Skip if `scan_report["ai_flows"]` is empty.
+
+Skip if `lockfile.ai_rag.signal-hash` matches the new signal hash AND
+`Projects/<P>/Architecture/ai-flows/rag.md` exists.
+
+1. Compute signal hash (mirrors Phase 3.8 but uses `llm-config` block hash
+   per flow, since embedding model lives there):
+   ```python
+   rag_signal = {
+       "ai_rag": scan_report["ai_rag"],
+       "per_flow_llm_config_hash": {
+           f["slug"]: _sha256_block(arch_dir / "ai-flows" / f"{f['slug']}.md",
+                                      "llm-config")
+           for f in scan_report["ai_flows"]
+       },
+   }
+   sig_hash = signal_hash(rag_signal)
+   ```
+
+2. Build prompt:
+   ```python
+   from scripts.architect.sections import build_ai_rag_prompt
+   prompt = build_ai_rag_prompt(
+       project=project_name,
+       ai_rag_signals=scan_report["ai_rag"],
+       ai_flows_summary=[...same shape as Phase 3.8...],
+       output_lang=output_lang,
+   )
+   ```
+
+3. Invoke LLM. Expect strict JSON: 11 keys.
+
+4. Compose:
+   ```python
+   from scripts.architect.sections import compose_ai_rag_note
+   summary = scan_report["ai_rag"]["summary"]
+   note = compose_ai_rag_note(
+       project=project_name,
+       repo_label=repo_label,
+       commit=commit,
+       signal_sources=["scan: ai_rag",
+                        f"ai-flows: {', '.join(f['slug'] for f in scan_report['ai_flows'])}",
+                        "manifest: modules"],
+       confidence="high" if summary["embedding_aligned"] is not None else "medium",
+       output_lang=output_lang,
+       generated_blocks=llm_output,
+       rag_flows_read=summary["read_flows"],
+       rag_flows_write=summary["write_flows"],
+       vector_store=summary["primary_vector_store"],
+       embedding_aligned=summary["embedding_aligned"],
+   )
+   ```
+
+5. Write to `Projects/<P>/Architecture/ai-flows/rag.md`.
+
+6. Update lockfile `ai_rag` (mirrors Phase 3.8 pattern).
+
+7. Hub block + overview drill-down (idempotent, sentinel-aware):
+   - Hub `Projects/<P>/<P>.md` architecture-section block: ensure line
+     `- AI memory + RAG 深判斷 (v4.3): [[Architecture/ai-flows/memory]] | [[Architecture/ai-flows/rag]]`
+     is present once.
+   - `Projects/<P>/Architecture/overview.md` drill-down block: ensure line
+     `- **AI 跨流程深判斷:** [[ai-flows/memory]] (lifecycle + TTL + compaction) | [[ai-flows/rag]] (data flow + embedding 對齊)`
+     is present once.
+
+If `--ai-memory-only` or `--ai-rag-only`: skip Phases 3 / 3.5 / 3.5.5 (features) / 4 (overview);
+only Phase 1 + 3.7 (needed for cross-link integrity) + the target phase run.
 
 ## Phase 4: Overview synthesis (v4 + v4.1)
 
