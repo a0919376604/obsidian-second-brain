@@ -1623,6 +1623,56 @@ def compose_features_note(
     return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
 
 
+def compose_brainstorm_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    mode: str,
+    lens_mix: list[str],
+    depth: str,
+    status: str,
+    session_duration_min: int,
+    provocations_opened: int,
+    provocations_drilled: int,
+    imps_distilled: int,
+    hypotheses_raised: int,
+) -> str:
+    """Wrap compose_note(section='brainstorm', ...) and merge session-specific
+    extra frontmatter fields BEFORE `ai-first: true`.
+
+    Fields injected: mode, lens-mix, depth, status, session-duration-min,
+    provocations-opened, provocations-drilled, imps-distilled, hypotheses-raised.
+    """
+    note = compose_note(
+        section="brainstorm",
+        project=project,
+        repo_label=repo_label,
+        commit=commit,
+        signal_sources=signal_sources,
+        confidence=confidence,
+        output_lang=output_lang,
+        generated_blocks=generated_blocks,
+    )
+    lens_mix_yaml = json.dumps(lens_mix, ensure_ascii=False)
+    extra_fm = (
+        f"mode: {mode}\n"
+        f"lens-mix: {lens_mix_yaml}\n"
+        f"depth: {depth}\n"
+        f"status: {status}\n"
+        f"session-duration-min: {session_duration_min}\n"
+        f"provocations-opened: {provocations_opened}\n"
+        f"provocations-drilled: {provocations_drilled}\n"
+        f"imps-distilled: {imps_distilled}\n"
+        f"hypotheses-raised: {hypotheses_raised}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def parse_doc_actions_block(body: str) -> list[dict]:
     """Parse the `doc-sync-actions` block into action dicts.
 

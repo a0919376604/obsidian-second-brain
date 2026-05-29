@@ -95,3 +95,78 @@ def test_parse_hypothesis_block_ignores_entries_missing_required_fields():
 def test_parse_hypothesis_block_returns_empty_when_no_h3():
     from scripts.architect.sections import parse_hypothesis_block
     assert parse_hypothesis_block("just paragraph text\nno h3 headings") == []
+
+
+def test_compose_brainstorm_note_emits_extra_frontmatter():
+    """compose_brainstorm_note merges session-specific frontmatter
+    (mode / lens-mix / depth / status / counts) before ai-first: true."""
+    from scripts.architect.sections import compose_brainstorm_note
+
+    blocks = {n: f"body for {n}" for n in (
+        "context", "opening-provocations", "drilled-explorations",
+        "distilled-imps", "hypotheses", "parked", "open-questions",
+        "meta-reflection", "dependencies",
+    )}
+    note = compose_brainstorm_note(
+        project="P",
+        repo_label="local: /tmp/p",
+        commit="abc1234",
+        signal_sources=["Architecture/*", "Research/*", "board.md"],
+        confidence="medium",
+        output_lang="zh-TW",
+        generated_blocks=blocks,
+        mode="generate",
+        lens_mix=["gap", "persona", "premortem"],
+        depth="medium",
+        status="fresh",
+        session_duration_min=28,
+        provocations_opened=5,
+        provocations_drilled=2,
+        imps_distilled=3,
+        hypotheses_raised=2,
+    )
+    assert "mode: generate" in note
+    assert "depth: medium" in note
+    assert "status: fresh" in note
+    assert "session-duration-min: 28" in note
+    assert "provocations-opened: 5" in note
+    assert "provocations-drilled: 2" in note
+    assert "imps-distilled: 3" in note
+    assert "hypotheses-raised: 2" in note
+    # lens-mix is a YAML list
+    assert 'lens-mix: ["gap", "persona", "premortem"]' in note
+    # Order: extras must come BEFORE `ai-first: true`.
+    fm = note.split("---", 2)[1]
+    assert fm.index("mode:") < fm.index("ai-first:")
+    assert fm.index("hypotheses-raised:") < fm.index("ai-first:")
+    # Body contains all 9 blocks via sentinels.
+    for name in blocks:
+        assert f"<!-- @generated:start {name} -->" in note
+        assert f"<!-- @generated:end {name} -->" in note
+
+
+def test_compose_brainstorm_note_zh_tw_renders_h2_in_zh():
+    """When output_lang=zh-TW, the H2 headings for brainstorm blocks come out in zh-TW."""
+    from scripts.architect.sections import compose_brainstorm_note
+
+    blocks = {n: f"body" for n in (
+        "context", "opening-provocations", "drilled-explorations",
+        "distilled-imps", "hypotheses", "parked", "open-questions",
+        "meta-reflection", "dependencies",
+    )}
+    note = compose_brainstorm_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["x"], confidence="medium", output_lang="zh-TW",
+        generated_blocks=blocks, mode="generate", lens_mix=["gap"],
+        depth="quick", status="fresh", session_duration_min=10,
+        provocations_opened=4, provocations_drilled=0,
+        imps_distilled=0, hypotheses_raised=0,
+    )
+    assert "## 對話脈絡" in note
+    assert "## 開場 provocations" in note
+    assert "## 深挖紀錄" in note
+    assert "## 提煉的 Imps" in note
+    assert "## 待驗證假設" in note
+    assert "## 暫不討論" in note
+    assert "## 仍不清楚" in note
+    assert "## 自我覆盤" in note
