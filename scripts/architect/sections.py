@@ -793,6 +793,91 @@ def compose_storyline_note(
     return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
 
 
+def build_companion_overview_prompt(
+    *,
+    project: str,
+    ai_companion_signals: dict,
+    layer_summaries: dict[str, str],
+    repomix_packed: str,
+    output_lang: str,
+) -> str:
+    if output_lang == "zh-TW":
+        lang_directive = "請以繁體中文撰寫。Mermaid node ID 保持英文。"
+        improvement_shape = "**為什麼:** / **證據:** / **Effort:** / **未做的風險:** / **Confidence:**"
+    else:
+        lang_directive = "Write all prose in English. Mermaid node IDs verbatim."
+        improvement_shape = "**Why:** / **Evidence:** / **Effort:** / **Risk if not done:** / **Confidence:**"
+
+    import json as _json
+    signals_json = _json.dumps(ai_companion_signals, indent=2, ensure_ascii=False, default=str)
+    summaries_lines = "\n".join(
+        f"- **{name}**: {summary[:300]}"
+        for name, summary in layer_summaries.items()
+    )
+
+    return "\n".join([
+        f"You are documenting the **AI companion 4-layer cross-cutting** report for `{project}`.",
+        f"Output language: {output_lang}. {lang_directive}",
+        "",
+        "## Critical rules",
+        "1. NO invention.",
+        "2. Wikilink-out per-layer detail. DO NOT rewrite single-layer content here.",
+        "3. ONE Mermaid graph in `four-layer-diagram`.",
+        "4. Cross-layer Imps only in `improvements` — single-layer Imps belong on per-layer files.",
+        "",
+        "## Output: 9 @generated blocks",
+        "",
+        "### `summary` — archetype detected; 4 layers one-line each",
+        "### `four-layer-diagram` — ONE Mermaid: Character ↔ World ↔ Storyline ↔ Memory + LLM provider",
+        "### `data-flow` — Per-turn: user → which layers consult, in what order → prompt → LLM → mutations",
+        "### `bind-points` — Cross-layer contracts; each binding lists owner",
+        "### `layer-maturity-table` — Table: Layer | Status (✅/⚠️/❌) | Wikilink | Primary risk",
+        "### `strengths` — 3-5 cross-layer bullets",
+        "### `weaknesses` — 3-5 cross-layer bullets",
+        f"### `improvements` — 3-5 cross-layer Imps: {improvement_shape}",
+        "### `dependencies` — wikilinks only",
+        "",
+        "Return strict JSON with all 9 keys.",
+        "",
+        "## Per-layer summaries (just-written, do NOT repeat verbatim)",
+        summaries_lines,
+        "",
+        "## AI companion signals",
+        signals_json,
+        "",
+        "## Repomix-packed context",
+        repomix_packed[:30000],
+    ])
+
+
+def compose_companion_overview_note(
+    *,
+    project: str,
+    repo_label: str,
+    commit: str,
+    signal_sources: list[str],
+    confidence: str,
+    output_lang: str,
+    generated_blocks: dict[str, str],
+    layers_stable: int,
+    layers_wip: int,
+    layers_missing: int,
+) -> str:
+    note = compose_note(
+        section="companion-overview", project=project, repo_label=repo_label,
+        commit=commit, signal_sources=signal_sources, confidence=confidence,
+        output_lang=output_lang, generated_blocks=generated_blocks,
+    )
+    extra_fm = (
+        f"layer: overview\n"
+        f"archetype: ai-companion\n"
+        f"layers-stable: {layers_stable}\n"
+        f"layers-wip: {layers_wip}\n"
+        f"layers-missing: {layers_missing}\n"
+    )
+    return note.replace("ai-first: true", extra_fm + "ai-first: true", 1)
+
+
 def _preamble_for(section: str, lang: str) -> str:
     """Short preamble describing the note's purpose to future-Claude."""
     if lang == "zh-TW":

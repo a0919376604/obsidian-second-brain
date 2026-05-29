@@ -226,3 +226,39 @@ def test_compose_storyline_note_emits_extra_frontmatter():
     assert "dsl-format: ai-eden-storyline-dsl-v1" in note
     assert "branch-count: 4" in note
     assert "layer: storyline" in note
+
+
+def test_build_companion_overview_prompt_requires_9_block_keys():
+    from scripts.architect.sections import build_companion_overview_prompt
+    prompt = build_companion_overview_prompt(
+        project="ai-eden",
+        ai_companion_signals={"archetype": "ai-companion", "confidence": "high",
+                              "layers": {}},
+        layer_summaries={"character-card": "6 cards", "world": "1 world",
+                         "storyline": "WIP DSL", "memory": "none"},
+        repomix_packed="", output_lang="zh-TW",
+    )
+    for key in ("summary", "four-layer-diagram", "data-flow", "bind-points",
+                "layer-maturity-table",
+                "strengths", "weaknesses", "improvements", "dependencies"):
+        assert key in prompt
+
+
+def test_compose_companion_overview_note_emits_extra_frontmatter():
+    from scripts.architect.sections import compose_companion_overview_note
+    blocks = {n: "body" for n in (
+        "summary", "four-layer-diagram", "data-flow", "bind-points",
+        "layer-maturity-table",
+        "strengths", "weaknesses", "improvements", "dependencies",
+    )}
+    note = compose_companion_overview_note(
+        project="P", repo_label="local: /tmp/p", commit="abc",
+        signal_sources=["x"], confidence="high",
+        output_lang="zh-TW", generated_blocks=blocks,
+        layers_stable=2, layers_wip=1, layers_missing=1,
+    )
+    assert "layers-stable: 2" in note
+    assert "layers-wip: 1" in note
+    assert "layers-missing: 1" in note
+    assert "archetype: ai-companion" in note
+    assert "layer: overview" in note
