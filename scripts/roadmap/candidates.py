@@ -245,12 +245,18 @@ def _extract_features_candidates(path: Path, arch_root: Path) -> list[Candidate]
 
 
 def _extract_ai_cross_flow_candidates(arch_root: Path) -> list[Candidate]:
-    """Extract v4.3 candidates from generated blocks in ai-flows/memory.md and rag.md."""
     out: list[Candidate] = []
-    for fname, candidate_type, default_priority in (
+    file_mappings = (
+        # v4.3
         ("ai-flows/memory.md", "ai-memory-improvement", "normal"),
         ("ai-flows/rag.md", "ai-rag-improvement", "normal"),
-    ):
+        # v4.6 — 4 companion layers
+        ("ai-flows/character-card.md", "companion-character-improvement", "normal"),
+        ("ai-flows/world.md", "companion-world-improvement", "normal"),
+        ("ai-flows/storyline.md", "companion-storyline-improvement", "normal"),
+        ("ai-flows/companion-overview.md", "companion-improvement", "normal"),
+    )
+    for fname, candidate_type, default_priority in file_mappings:
         note_path = arch_root / fname
         if not note_path.exists():
             continue
@@ -264,16 +270,23 @@ def _extract_ai_cross_flow_candidates(arch_root: Path) -> list[Candidate]:
         rel = note_path.relative_to(arch_root.parent).as_posix().replace(".md", "")
         for entry in _parse_feature_imp_entries(imp_body):
             priority = default_priority
+            evidence_list = entry["evidence"]
+            # v4.3 rule: rag.md with embedding-aligned evidence → high
             if fname.endswith("rag.md") and any(
-                "embedding-aligned" in evidence.lower() for evidence in entry["evidence"]
+                "embedding-aligned" in evidence.lower() for evidence in evidence_list
             ):
                 priority = "high"
+            # v4.6 rule: companion-overview.md Imp citing ≥2 layer wikilinks → high
+            if fname.endswith("companion-overview.md"):
+                layer_wikilink_count = sum(
+                    1 for layer in ("character-card", "world", "storyline", "memory")
+                    if any(f"ai-flows/{layer}" in ev for ev in evidence_list)
+                )
+                if layer_wikilink_count >= 2:
+                    priority = "high"
             cand = _candidate_from_feature_imp(
-                entry,
-                rel=rel,
-                block="improvements",
-                kind=candidate_type,
-                priority=priority,
+                entry, rel=rel, block="improvements",
+                kind=candidate_type, priority=priority,
             )
             cand.source = f"{fname}#improvements"
             out.append(cand)

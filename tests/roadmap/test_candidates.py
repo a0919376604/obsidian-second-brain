@@ -608,3 +608,75 @@ def test_detect_candidates_dedup_brainstorm_beats_architecture(tmp_path):
     assert not any("architecture inferred" in t for t in titles), (
         f"architecture imp with overlapping evidence should be deduped; got {titles}"
     )
+
+
+def test_detect_candidates_walks_character_card_md(tmp_path):
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "ai-flows").mkdir(parents=True)
+    (arch / "ai-flows" / "character-card.md").write_text(
+        "---\ntype: architecture-character-card\n---\n\n"
+        "## 改進機會\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Imp 1: 加入 attachment-style segmentation\n"
+        "- **為什麼:** persona research 顯示分層 retention 提升\n"
+        "- **證據:** [[Research/Web/2026-05-29-companion-chat-vs-story-rpg-retention]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 留存上不去\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    assert any("attachment-style" in t for t in titles), (
+        f"character-card Imp not picked up; got {titles}"
+    )
+
+
+def test_detect_candidates_companion_overview_cross_layer_priority_high(tmp_path):
+    """Imp citing ≥2 layer wikilinks gets priority=high (cross-layer signal)."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "ai-flows").mkdir(parents=True)
+    (arch / "ai-flows" / "companion-overview.md").write_text(
+        "---\ntype: architecture-companion-overview\n---\n\n"
+        "## Companion 改進方向\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Imp 1: Storyline 與 Memory 共用 progression state\n"
+        "- **為什麼:** 跨層 state 同步減少 drift\n"
+        "- **證據:** [[Architecture/ai-flows/storyline]] | [[Architecture/ai-flows/memory]]\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** state 不一致\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    imp = next((c for c in cands if "progression state" in c.title), None)
+    assert imp is not None
+    assert imp.priority == "high"
+
+
+def test_detect_candidates_companion_overview_single_layer_priority_normal(tmp_path):
+    """Imp citing only 1 layer → priority=normal."""
+    from scripts.roadmap.candidates import detect_candidates
+    arch = tmp_path / "Architecture"
+    (arch / "ai-flows").mkdir(parents=True)
+    (arch / "ai-flows" / "companion-overview.md").write_text(
+        "---\ntype: architecture-companion-overview\n---\n\n"
+        "## Companion 改進方向\n"
+        "<!-- @generated:start improvements -->\n"
+        "### Imp 1: Single-layer Imp\n"
+        "- **為什麼:** x\n"
+        "- **證據:** [[Architecture/ai-flows/storyline]]\n"
+        "- **Effort:** S\n"
+        "- **未做的風險:** y\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end improvements -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    imp = next((c for c in cands if "Single-layer" in c.title), None)
+    assert imp is not None
+    assert imp.priority == "normal"
