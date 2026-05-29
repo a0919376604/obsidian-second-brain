@@ -177,3 +177,66 @@ def test_empty_ai_flows_list_returns_empty(tmp_path: Path):
     assert result["summary"]["read_flows"] == 0
     assert result["summary"]["write_flows"] == 0
     assert result["summary"]["embedding_aligned"] is None
+
+
+def test_qdrant_string_in_config_does_not_trigger_qdrant_store(tmp_path: Path):
+    """Repro: langlive mem0_memory.py has `vector_provider == 'qdrant'` config string.
+    That's runtime-conditional, not an actual qdrant import. Must NOT mark store
+    as qdrant unless `qdrant_client` is imported."""
+    flow_root = tmp_path / "mem0"
+    flow_root.mkdir()
+    (flow_root / "memory.py").write_text(
+        "import os\n"
+        "def setup(vector_provider: str):\n"
+        '    if vector_provider == "qdrant":\n'
+        '        host = os.getenv("QDRANT_HOST", "localhost")\n'
+        '    elif vector_provider == "weaviate":\n'
+        "        import weaviate\n"
+        "        client = weaviate.Client()\n"
+        "        return client\n",
+        encoding="utf-8",
+    )
+
+    class _Flow:
+        slug = "mem0"
+        root_path = "mem0"
+
+    result = detect_rag(tmp_path, [_Flow()])
+    stores = result["per_flow"]["mem0"]["vector_stores"]
+    assert "qdrant" not in stores, f"qdrant config string should not trigger; got {stores}"
+    assert "weaviate" in stores
+
+
+def test_evaluation_subdir_does_not_drive_role_to_both(tmp_path: Path):
+    """Repro: qa_to_kb has evaluation/ subdir with similarity_search + add_documents
+    calls (eval-only). Production pipeline is write-only. Role must be 'write',
+    not 'both'."""
+    flow_root = tmp_path / "qa_to_kb"
+    (flow_root / "evaluation" / "retrieval").mkdir(parents=True)
+    # Eval-only file: BOTH read and write calls.
+    (flow_root / "evaluation" / "retrieval" / "eval.py").write_text(
+        "from langchain_weaviate.vectorstores import WeaviateVectorStore\n"
+        "vs = WeaviateVectorStore()\n"
+        "vs.add_documents(docs)\n"
+        "vs.similarity_search(q, k=5)\n",
+        encoding="utf-8",
+    )
+    # Production pipeline: write-only.
+    (flow_root / "pipeline.py").write_text(
+        "from langchain_openai import OpenAIEmbeddings\n"
+        "from langchain_weaviate.vectorstores import WeaviateVectorStore\n"
+        "embed = OpenAIEmbeddings(model='text-embedding-3-small')\n"
+        "vs = WeaviateVectorStore(embedding=embed)\n"
+        "vs.add_documents(docs)\n",
+        encoding="utf-8",
+    )
+
+    class _Flow:
+        slug = "qa_to_kb"
+        root_path = "qa_to_kb"
+
+    result = detect_rag(tmp_path, [_Flow()])
+    assert result["per_flow"]["qa_to_kb"]["role"] == "write", (
+        f"evaluation/ subdir should not drive role to both; "
+        f"got {result['per_flow']['qa_to_kb']['role']}"
+    )

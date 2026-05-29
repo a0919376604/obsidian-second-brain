@@ -16,14 +16,23 @@ from pathlib import Path
 # ---------- vector store detection ----------
 
 _VECTOR_STORE_HINTS = {
-    "weaviate": ("weaviate", "langchain_weaviate"),
-    "chromadb": ("chromadb", "chroma"),
-    "pinecone": ("pinecone",),
-    "qdrant": ("qdrant_client", "qdrant"),
-    "lancedb": ("lancedb",),
-    "faiss": ("faiss",),
-    "pgvector": ("pgvector",),
+    # Hints are substring-matched against source text. Keep them specific
+    # enough to avoid matching bare config strings (e.g. `vector_provider ==
+    # "qdrant"` should NOT mark a flow as using qdrant — only actual imports
+    # of qdrant_client should).
+    "weaviate": ("import weaviate", "from weaviate", "langchain_weaviate"),
+    "chromadb": ("import chromadb", "from chromadb", "langchain_chroma"),
+    "pinecone": ("import pinecone", "from pinecone"),
+    "qdrant": ("qdrant_client",),
+    "lancedb": ("import lancedb", "from lancedb"),
+    "faiss": ("import faiss", "from faiss"),
+    "pgvector": ("from pgvector", "import pgvector"),
 }
+
+# Subdirectories that are test/eval scaffolding — their .py files are excluded
+# from the role classifier because production role shouldn't be determined by
+# eval-only code that exercises both write + read paths.
+_NON_PRODUCTION_DIRS = {"evaluation", "tests", "test", "examples", "__pycache__"}
 
 # ---------- embedding detection ----------
 
@@ -122,6 +131,15 @@ def _scan_flow(flow_dir: Path, repo_root: Path) -> dict:
             continue
         rel = py_file.relative_to(repo_root).as_posix()
 
+        # Detect whether the file lives under a non-production directory.
+        # These contribute to vector store / embedding / rerank inventory (still
+        # useful evidence) but NOT to role classification — eval scaffolding
+        # exercising both read+write paths would otherwise misclassify flows
+        # as role=both when production behavior is read-only or write-only.
+        is_non_production = any(
+            part in _NON_PRODUCTION_DIRS for part in py_file.relative_to(flow_dir).parts
+        )
+
         # Vector store libs.
         for label, hints in _VECTOR_STORE_HINTS.items():
             if any(h in text for h in hints):
@@ -139,13 +157,14 @@ def _scan_flow(flow_dir: Path, repo_root: Path) -> dict:
         for label, hints in _RERANK_LIB_HINTS.items():
             if any(h in text for h in hints):
                 rerank_libs.add(label)
-        # Role-classifier hints.
-        if _READ_CALL_RE.search(text):
-            has_read_calls = True
-        if _WRITE_CALL_RE.search(text):
-            has_write_calls = True
-        if _EMBED_CALL_RE.search(text):
-            has_embed_calls = True
+        # Role-classifier hints — skip non-production dirs.
+        if not is_non_production:
+            if _READ_CALL_RE.search(text):
+                has_read_calls = True
+            if _WRITE_CALL_RE.search(text):
+                has_write_calls = True
+            if _EMBED_CALL_RE.search(text):
+                has_embed_calls = True
         # Retrieve params.
         for m in _PARAM_RE.finditer(text):
             k = m.group("key")
