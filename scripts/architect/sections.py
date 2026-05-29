@@ -1921,6 +1921,53 @@ def parse_improvements_block(text: str) -> list[ImprovementItem]:
     return items
 
 
+_HYPOTHESIS_TITLE_RE = re.compile(r"^###\s+(.+?)\s*$", re.MULTILINE)
+_HYPOTHESIS_FIELD_RE = re.compile(r"^-\s+\*\*(.+?):\*\*\s*(.+)$", re.MULTILINE)
+_HYPOTHESIS_FIELD_ALIASES = {
+    "assumption": "assumption",
+    "假設": "assumption",
+    "validation": "validation",
+    "驗證方式": "validation",
+    "kill criterion": "kill_criterion",
+    "kill_criterion": "kill_criterion",
+    "owner": "owner",
+    "status": "status",
+}
+
+
+def parse_hypothesis_block(body: str) -> list[dict]:
+    """Parse a brainstorm hypotheses block into dicts.
+
+    Each H3 entry becomes a dict with fields:
+    {title, assumption, validation, kill_criterion, owner, status}.
+    Entries missing any of {assumption, validation, kill_criterion} are dropped.
+    """
+    parts = _HYPOTHESIS_TITLE_RE.split(body)
+    if len(parts) < 3:
+        return []
+    out: list[dict] = []
+    for i in range(1, len(parts), 2):
+        title = parts[i].strip()
+        entry_body = parts[i + 1] if i + 1 < len(parts) else ""
+        fields: dict[str, str] = {}
+        for m in _HYPOTHESIS_FIELD_RE.finditer(entry_body):
+            key = _HYPOTHESIS_FIELD_ALIASES.get(m.group(1).strip().lower())
+            if key:
+                fields[key] = m.group(2).strip()
+        required = {"assumption", "validation", "kill_criterion"}
+        if not required.issubset(fields):
+            continue
+        out.append({
+            "title": title,
+            "assumption": fields["assumption"],
+            "validation": fields["validation"],
+            "kill_criterion": fields["kill_criterion"],
+            "owner": fields.get("owner", ""),
+            "status": fields.get("status", "unvalidated"),
+        })
+    return out
+
+
 _LABEL_ALIASES = {
     # Canonical key -> aliases in either language
     "Why": {"why", "為什麼"},
