@@ -70,6 +70,14 @@ def refresh_board(
         buckets.append("Misc / Untriaged")
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    new_board_text = _update_frontmatter_last_refresh(board_text, now_iso)
+    new_board_text = _update_frontmatter_totals(
+        new_board_text,
+        done=len(done),
+        in_flight=len(in_flight),
+        backlog=len(backlog),
+    )
+    board_path.write_text(new_board_text, encoding="utf-8")
 
     return RefreshResult(
         status="ok",
@@ -224,6 +232,36 @@ def _new_items_from_signals(signals: dict) -> list[dict]:
             }
         )
     return items
+
+
+def _update_frontmatter_last_refresh(text: str, new_ts: str) -> str:
+    """Replace or add `last-refresh:` in the first frontmatter block."""
+    m = re.match(r"^(---\n)(.*?)(\n---)", text, re.DOTALL)
+    if not m:
+        return f"---\nlast-refresh: {new_ts}\n---\n\n{text}"
+    head, fm, tail = m.group(1), m.group(2), m.group(3)
+    if _FRONTMATTER_LAST_REFRESH_RE.search(fm):
+        new_fm = _FRONTMATTER_LAST_REFRESH_RE.sub(f"last-refresh: {new_ts}", fm, count=1)
+    else:
+        new_fm = fm + f"\nlast-refresh: {new_ts}"
+    return head + new_fm + tail + text[m.end() :]
+
+
+def _update_frontmatter_totals(text: str, *, done: int, in_flight: int, backlog: int) -> str:
+    """Ensure frontmatter contains current totals."""
+    m = re.match(r"^(---\n)(.*?)(\n---)", text, re.DOTALL)
+    if not m:
+        return text
+    head, fm, tail = m.group(1), m.group(2), m.group(3)
+    pairs = [("done", done), ("in-flight", in_flight), ("backlog", backlog)]
+    new_fm = fm
+    for key, value in pairs:
+        pat = re.compile(rf"^{re.escape(key)}:\s*\d+\s*$", re.MULTILINE)
+        if pat.search(new_fm):
+            new_fm = pat.sub(f"{key}: {value}", new_fm)
+        else:
+            new_fm = new_fm + f"\n{key}: {value}"
+    return head + new_fm + tail + text[m.end() :]
 
 
 def _classify_items(items: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:

@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from scripts.board.refresh import RefreshResult, refresh_board
+from scripts.board.refresh import _FRONTMATTER_LAST_REFRESH_RE, RefreshResult, refresh_board
 
 
 def test_refresh_returns_skipped_when_no_board_md(tmp_path: Path):
@@ -205,3 +205,29 @@ def test_refresh_with_signals_reuses_caller_data(tmp_path: Path):
     assert result.done_count == 1
     titles = [item["title"] for item in result.new_items]
     assert "feat: pre-collected" in titles
+
+
+def test_refresh_writes_updated_last_refresh_to_frontmatter(tmp_path: Path):
+    """After refresh, board.md frontmatter has updated last-refresh timestamp."""
+    proj_dir = tmp_path / "Projects" / "myproject"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "myproject.md").write_text(
+        f"---\nlocal-path: {tmp_path / 'repo'}\n---\n", encoding="utf-8"
+    )
+    (proj_dir / "board.md").write_text(
+        "---\nlast-refresh: 2026-05-01T00:00:00\ntotal: 0\n---\n\n"
+        "## 待辦\n- old\n",
+        encoding="utf-8",
+    )
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _commit(repo, "a.py", "x=1\n", "do thing", "2026-05-15T00:00:00")
+
+    result = refresh_board(project_dir=proj_dir, signals=None, full=False)
+    assert result.status == "ok"
+    # Read board back; last-refresh should be NEWER than before.
+    new_text = (proj_dir / "board.md").read_text(encoding="utf-8")
+    new_ts = _FRONTMATTER_LAST_REFRESH_RE.search(new_text).group("ts").strip()
+    assert new_ts > "2026-05-01T00:00:00", f"new last-refresh should be later; got {new_ts}"
+    assert new_ts == result.last_refresh_after
