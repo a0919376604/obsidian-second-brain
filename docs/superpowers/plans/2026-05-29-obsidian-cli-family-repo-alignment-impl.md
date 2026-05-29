@@ -1,3 +1,13 @@
+## Resolution log
+
+Both blockers captured during the codex run are cosmetic — the plan over-predicted FAIL counts because the **Task 1 placeholders coincidentally satisfied a future test**:
+
+**Task 2 Step 2** — Expected 3 FAILs, got 2 FAILs + 1 PASS. `test_resolve_repo_arg_absolute_path_no_match` already passed because Task 1's `_resolve_absolute_path` placeholder returned `state="unknown"` with the input path in the message — which is exactly what the test asserts. The real missing functionality (single-match → `state="project"`, multiple-match → `state="ambiguous"`) DID fail correctly. TDD intent preserved.
+
+**Task 3 Step 2** — Expected 4 FAILs, got 3 FAILs + 1 PASS. Same shape: `test_resolve_repo_arg_unknown_project_name` already passed because Task 1's placeholder returned `state="unknown"` with the full project list. The truly missing fuzzy / substring matching DID fail.
+
+In both cases the RED state was incomplete but the implementation pressure was correctly applied. No fix needed — final 11 resolver tests pass, full suite 419 green, 4 adapters build.
+
 # Obsidian CLI Family `<repo>` Alignment Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
