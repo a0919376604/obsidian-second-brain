@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (CLI family alignment)
+
+- 5 commands now share `<repo>` first-positional grammar via the new
+  `scripts/commands/repo_resolver.py` helper. Per spec
+  `docs/superpowers/specs/2026-05-29-obsidian-cli-family-repo-alignment-design.md`.
+- `/obsidian-architect <repo>` — unchanged user-facing; internal Phase 0
+  now routes through shared resolver.
+- `/obsidian-brainstorm <repo>` — argument-hint renamed from
+  `<project-name>` (now also accepts absolute path via hub
+  local-path match).
+- `/obsidian-roadmap <repo>` — same shape change.
+- `/obsidian-research <repo> <topic> [--academic]` — NEW (renamed from
+  `/research`). `<repo>` accepts `global` sentinel for vault-wide.
+- `/obsidian-research-deep <repo> <topic>` — NEW (renamed from
+  `/research-deep`).
+
+### Deprecated
+
+- `/research` — use `/obsidian-research`. Stub remains for one minor
+  release with deprecation warning; will be removed.
+- `/research-deep` — use `/obsidian-research-deep`. Same treatment.
+
+### Added
+
+- `scripts/commands/repo_resolver.py` — shared `<repo>` argument resolver
+  with `RepoResolution` dataclass (4 states: project / global /
+  ambiguous / unknown). 11 unit tests in
+  `tests/commands/test_repo_resolver.py`.
+- Frontmatter field `param-autocomplete` for slash commands — reserved
+  for future Discord adapter to generate slash-command schemas.
+  Sources: `vault-projects` / `vault-projects-plus-global` / `freetext`.
+
 ### Added
 
 - `/obsidian-brainstorm` - new slash command for "stuck on next step"
