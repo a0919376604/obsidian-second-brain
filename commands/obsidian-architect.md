@@ -3,6 +3,9 @@ description: Scan a codebase and generate architecture overview plus module note
 argument-hint: <repo>
 category: vault
 triggers_en: ["architect", "architecture doc", "scan repo", "document architecture", "codebase overview"]
+param-autocomplete:
+  - name: repo
+    source: vault-projects
 ---
 
 Use the obsidian-second-brain skill. Execute `/obsidian-architect $ARGUMENTS`:
@@ -50,21 +53,37 @@ The argument is `<repo-path>` (local path or github URL). Optional flags:
 If `<repo-path>` is omitted and `pwd` is inside a git repo, default to `.`.
 Otherwise ASK the user.
 
-## Project routing
+## Project routing (v4.5 — shared resolver)
 
-Resolve the target project hub in this order:
+Parse the first whitespace-delimited token from `$ARGUMENTS` as `<repo>`. Then:
 
-1. `--project=<P>` flag.
-2. Search the vault for a project hub whose `local-path` frontmatter (resolved
-   to an absolute path) equals the absolute path of `<repo-path>`. Exactly one
-   match: use it.
-3. Zero matches: create a new project hub. Follow the same conventions as
-   `/obsidian-project`: sub-folder layout, hub frontmatter schema with `date`,
-   `tags: [project]`, `status: active`, `local-path`, the
-   `Projects/<P>/{Ideas,Tasks,Decisions,Learnings,Research,Competitors,Recaps}/`
-   skeleton, and a `board.md`. Project name defaults to the repo folder basename.
-   ASK the user before creating so typos can be corrected.
-4. Multiple matches: abort, list candidates, ask user to pass `--project=<P>`.
+```python
+import shlex
+tokens = shlex.split(args, posix=True)
+if not tokens:
+    abort("missing <repo> argument. Usage: /obsidian-architect <repo> [--refresh] [--no-features] ...")
+repo_token = tokens[0]
+remaining_flags = tokens[1:]
+
+from scripts.commands.repo_resolver import resolve_repo_arg
+resolution = resolve_repo_arg(
+    repo_token,
+    vault_root=Path("~/Documents/SecondBrain").expanduser(),
+    allow_global=False,   # architect requires a real project
+)
+
+if resolution.state == "project":
+    project_dir = resolution.project_dir
+    project_slug = resolution.project_slug
+    local_path = resolution.local_path
+elif resolution.state == "ambiguous":
+    ask_user_to_pick(resolution.candidates)
+elif resolution.state == "unknown" or resolution.state == "global":
+    # 'global' rejected for architect. unknown -> may need /obsidian-project first.
+    abort(resolution.message)
+```
+
+`<repo>` accepts (a) a project name like `langlive-line-oa`, (b) an absolute path that the project hub's `local-path` frontmatter binds to. If the path doesn't bind any hub, the resolver's error message includes the available project list and suggests running `/obsidian-project <name>` first.
 
 ## Phase 1: Deterministic scan
 
