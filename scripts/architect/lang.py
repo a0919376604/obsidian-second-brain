@@ -146,6 +146,27 @@ HEADING_MAP: dict[str, dict[str, str]] = {
     "## Ingest pipeline": {"en": "## Ingest pipeline", "zh-TW": "## Ingest 管線"},
     "## Vector store config": {"en": "## Vector store config", "zh-TW": "## Vector store 設定"},
     "## Retrieve strategy": {"en": "## Retrieve strategy", "zh-TW": "## Retrieve 策略"},
+    # v4.4 brainstorm (project interview output)
+    "## Session context": {"en": "## Session context", "zh-TW": "## 對話脈絡"},
+    "## Opening provocations": {
+        "en": "## Opening provocations",
+        "zh-TW": "## 開場 provocations",
+    },
+    "## Drilled explorations": {
+        "en": "## Drilled explorations",
+        "zh-TW": "## 深挖紀錄",
+    },
+    "## Distilled improvements": {
+        "en": "## Distilled improvements",
+        "zh-TW": "## 提煉的 Imps",
+    },
+    "## Hypotheses to validate": {
+        "en": "## Hypotheses to validate",
+        "zh-TW": "## 待驗證假設",
+    },
+    "## Parked": {"en": "## Parked", "zh-TW": "## 暫不討論"},
+    "## Open questions": {"en": "## Open questions", "zh-TW": "## 仍不清楚"},
+    "## Meta reflection": {"en": "## Meta reflection", "zh-TW": "## 自我覆盤"},
 }
 
 

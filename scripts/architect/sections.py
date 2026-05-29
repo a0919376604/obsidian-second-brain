@@ -51,6 +51,8 @@ SECTION_TYPES = {
     # v4.3 cross-flow lenses
     "ai-memory": "architecture-ai-memory",
     "ai-rag": "architecture-ai-rag",
+    # v4.4 — brainstorm (project-level interview)
+    "brainstorm": "project-brainstorm",
 }
 
 
@@ -220,6 +222,18 @@ _BLOCK_NAMES = {
         "improvements",
         "dependencies",
     ),
+    # v4.4 — brainstorm (9 blocks for the project interview output)
+    "brainstorm": (
+        "context",
+        "opening-provocations",
+        "drilled-explorations",
+        "distilled-imps",
+        "hypotheses",
+        "parked",
+        "open-questions",
+        "meta-reflection",
+        "dependencies",
+    ),
 }
 
 # v4 — these sections are still callable for backward compat but no longer
@@ -297,6 +311,15 @@ _BLOCK_HEADINGS = {
     "vector-store-config": "## Vector store config",
     "retrieve-strategy": "## Retrieve strategy",
     "embedding-providers": "## Embedding providers",
+    # v4.4 brainstorm block headings
+    "context": "## Session context",
+    "opening-provocations": "## Opening provocations",
+    "drilled-explorations": "## Drilled explorations",
+    "distilled-imps": "## Distilled improvements",
+    "hypotheses": "## Hypotheses to validate",
+    "parked": "## Parked",
+    "open-questions": "## Open questions",
+    "meta-reflection": "## Meta reflection",
 }
 
 
@@ -499,6 +522,7 @@ def _preamble_for(section: str, lang: str) -> str:
             "ai-flow": "本檔是單一 AI 流程的深判斷 — 包含 graph 結構、state schema、prompts 全文、LLM 設定、評估與設計優缺點。",
             "ai-memory": "本檔是 AI 記憶層的跨流程深判斷 — lifecycle、TTL、compaction、context window 管理。Per-flow state shape 請見 [[Architecture/ai-flows/<slug>#State schema]]。",
             "ai-rag": "本檔是 RAG (retrieval-augmented generation) 跨流程管線深判斷 — ingest → vector store → retrieve、embedding 對齊、評估。Per-flow LLM 設定請見 [[Architecture/ai-flows/<slug>#LLM config]]。",
+            "brainstorm": "本檔是 `/obsidian-brainstorm` session 輸出 — Claude 採訪式 brainstorm,從 vault 全部 project 素材出發,丟出大膽推測 (provocations),引導使用者反應與深挖,蒸餾成 ImprovementItem 與待驗證假設。被 `/obsidian-roadmap` 自動撿走進 backlog。",
         }[section]
     return {
         "api-surface": "This is the API surface reference. Look up commands or endpoints here.",
@@ -513,6 +537,7 @@ def _preamble_for(section: str, lang: str) -> str:
         "ai-flow": "Deep judgment for a single AI flow — graph topology, state schema, full prompts, LLM config, evaluation, and design pros/cons.",
         "ai-memory": "Cross-flow AI memory lens — lifecycle, TTL, compaction, context window management. For per-flow state shape see [[Architecture/ai-flows/<slug>#State schema]].",
         "ai-rag": "Cross-flow RAG (retrieval-augmented generation) lens — ingest → vector store → retrieve, embedding alignment, evaluation. For per-flow LLM config see [[Architecture/ai-flows/<slug>#LLM config]].",
+        "brainstorm": "Output of an `/obsidian-brainstorm` session — Claude interviews the user, starts from vault project materials, throws bold next-direction provocations, drills via follow-ups, and distills ImprovementItems plus hypotheses-to-validate. Picked up by `/obsidian-roadmap` automatically.",
     }[section]
 
 

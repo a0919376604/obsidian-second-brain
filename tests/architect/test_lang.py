@@ -170,3 +170,22 @@ def test_heading_map_includes_v4_3_keys():
         assert en in HEADING_MAP, f"missing heading key {en!r}"
         assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
         assert HEADING_MAP[en]["en"] == en
+
+
+def test_heading_map_includes_brainstorm_keys():
+    """v1 brainstorm introduces 8 new H2 headings."""
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        "## Session context": "## 對話脈絡",
+        "## Opening provocations": "## 開場 provocations",
+        "## Drilled explorations": "## 深挖紀錄",
+        "## Distilled improvements": "## 提煉的 Imps",
+        "## Hypotheses to validate": "## 待驗證假設",
+        "## Parked": "## 暫不討論",
+        "## Open questions": "## 仍不清楚",
+        "## Meta reflection": "## 自我覆盤",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en
