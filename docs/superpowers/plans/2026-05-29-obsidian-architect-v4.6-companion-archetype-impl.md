@@ -1,5 +1,32 @@
 # obsidian-architect v4.6 (AI Companion Archetype) Implementation Plan
 
+## Resolution (2026-05-30)
+
+Task 15 originally hit a blocker: ai-eden-service `ai_flows count: 0` despite
+Task 4's custom-pipeline loosening landing. Root cause: ai-eden inlines system
+prompts as Python strings inside `app/providers/*_provider.py` and has NO
+`prompts*` file — so the Task 4 loosening still failed the
+`(prompt_files or any(p.name.startswith("prompts") for p in py_files))` clause.
+The Task 4 unit test passed only because its synthetic fixture had a
+`prompts.toml`.
+
+Spec intent was `(prompt_files or has_companion_archetype_signal)`; the plan's
+implementation dropped the second half. Follow-up fix:
+
+- `scripts/architect/ai_flow.py`: added `companion_archetype: bool = False`
+  kwarg to `detect_ai_flows` + `_classify_candidate`. Branch 2's prompt clause
+  now reads `(prompt_files or prompts*.py or companion_archetype)`.
+- `scripts/architect/scan.py`: reorders companion detection BEFORE
+  `detect_ai_flows` and threads `companion_archetype=is_companion` through.
+- `tests/architect/test_ai_flow.py`: 2 new fixture-shaped tests mirroring
+  ai-eden's real layout (no prompts file):
+  `test_custom_pipeline_with_companion_archetype_waives_prompts_file` and
+  `test_companion_archetype_does_not_force_unrelated_repos` (sanity).
+
+Smoke against ai-eden-service after fix: `ai_flows count: 1` (app,
+custom-pipeline, openai) + `ai_companion.archetype=ai-companion` + all 4
+layers detected. All 463 tests pass; 4 adapters build clean.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add AI companion-bot archetype detection + 4-layer schema (Character Card / World / Storyline / cross-cutting overview, reusing v4.3 memory.md) to `/obsidian-architect`. Fix the v4.1 detector miss that gave `ai-eden-service` "0 AI flows" despite having LLMs + 4 distinct AI layers.

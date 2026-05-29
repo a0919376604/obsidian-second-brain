@@ -42,7 +42,11 @@ class AIFlow:
 
 # ---------- detection orchestrator ----------
 
-def detect_ai_flows(repo_root: Path) -> list[AIFlow]:
+def detect_ai_flows(
+    repo_root: Path,
+    *,
+    companion_archetype: bool = False,
+) -> list[AIFlow]:
     """Find all AI flow subsystems in this repo.
 
     Heuristic:
@@ -51,6 +55,12 @@ def detect_ai_flows(repo_root: Path) -> list[AIFlow]:
     3. Drop candidates failing NODE_THRESHOLD (default 3).
     4. Drop ancestor candidates when a more-specific nested flow also qualified
        (e.g. backend/engines is dropped when backend/engines/langgraph qualifies).
+
+    `companion_archetype=True` (v4.6) signals that this repo was detected as an
+    AI-companion archetype (Character / World / Storyline / Memory). In that
+    case the custom-pipeline branch's `prompts*` file requirement is waived,
+    because companion stacks like ai-eden-service inline their system prompts
+    as Python strings inside provider modules instead of using prompts.toml.
     """
     repo_root = repo_root.resolve()
     flows: list[AIFlow] = []
@@ -61,7 +71,10 @@ def detect_ai_flows(repo_root: Path) -> list[AIFlow]:
         if candidate_root in seen_roots:
             continue
         seen_roots.add(candidate_root)
-        flow = _classify_candidate(candidate_root, repo_root, deps)
+        flow = _classify_candidate(
+            candidate_root, repo_root, deps,
+            companion_archetype=companion_archetype,
+        )
         if flow and flow.node_count >= NODE_THRESHOLD:
             flows.append(flow)
     return _drop_ancestor_duplicates(flows)
@@ -124,8 +137,20 @@ def _candidate_roots(repo_root: Path) -> list[Path]:
     return sorted(candidates)
 
 
-def _classify_candidate(candidate: Path, repo_root: Path, deps: list[str]) -> AIFlow | None:
-    """Return an AIFlow if `candidate` is a real AI flow root, else None."""
+def _classify_candidate(
+    candidate: Path,
+    repo_root: Path,
+    deps: list[str],
+    *,
+    companion_archetype: bool = False,
+) -> AIFlow | None:
+    """Return an AIFlow if `candidate` is a real AI flow root, else None.
+
+    When `companion_archetype=True` (v4.6), the custom-pipeline branch's
+    `prompts*` file requirement is waived — companion stacks frequently inline
+    system prompts in provider modules instead of using a top-level prompts
+    file.
+    """
     py_files = [p for p in candidate.rglob("*.py") if not _EXCLUDED_DIRS.intersection(p.parts)]
 
     has_langgraph_dep = any("langgraph" in d.lower() for d in deps)
@@ -193,7 +218,11 @@ def _classify_candidate(candidate: Path, repo_root: Path, deps: list[str]) -> AI
         has_pipeline_file
         and (has_nodes_dir or has_llm_provider_imports)
         and (has_llm_dep or llm_libs)
-        and (prompt_files or any(p.name.startswith("prompts") for p in py_files))
+        and (
+            prompt_files
+            or any(p.name.startswith("prompts") for p in py_files)
+            or companion_archetype
+        )
     ):
         return AIFlow(
             slug=slug, name=name, framework="custom-pipeline", root_path=rel_root,

@@ -81,34 +81,10 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
     api_surface = detect_api_surface(repo_root)
     commit_decisions = [asdict(c) for c in extract_commit_decisions(repo_root, limit=200)]
 
-    # AI flow detection + per-flow prompt extraction (v4.1).
-    ai_flow_records = list(detect_ai_flows(repo_root))
-    ai_flows_data: list[dict] = []
-    for flow in ai_flow_records:
-        flow_dict = {
-            "slug": flow.slug,
-            "name": flow.name,
-            "framework": flow.framework,
-            "root_path": flow.root_path,
-            "flow_kind": flow.flow_kind,
-            "node_count": flow.node_count,
-            "prompt_files": flow.prompt_files,
-            "state_module": flow.state_module,
-            "graph_files": flow.graph_files,
-            "llm_libs": flow.llm_libs,
-            "confidence": flow.confidence,
-            "prompts": [asdict(p) for p in extract_prompts(repo_root / flow.root_path)],
-        }
-        ai_flows_data.append(flow_dict)
-
-    # v4.3 — cross-flow AI memory + RAG signals.
-    from scripts.architect.ai_memory_detect import detect_memory
-    from scripts.architect.ai_rag_detect import detect_rag
-
-    ai_memory_data = detect_memory(repo_root, ai_flow_records)
-    ai_rag_data = detect_rag(repo_root, ai_flow_records)
-
-    # v4.6 — AI companion archetype detection
+    # v4.6 — AI companion archetype detection (runs BEFORE detect_ai_flows
+    # so the loosened custom-pipeline branch can waive prompts-file requirement
+    # when the project is a companion stack like ai-eden-service that inlines
+    # prompts in provider modules).
     from scripts.architect.companion_detect import detect_companion_archetype
 
     hub_frontmatter = None
@@ -134,6 +110,34 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
         repo_root=repo_root,
         hub_frontmatter=hub_frontmatter,
     )
+    is_companion = companion.archetype == "ai-companion"
+
+    # AI flow detection + per-flow prompt extraction (v4.1).
+    ai_flow_records = list(detect_ai_flows(repo_root, companion_archetype=is_companion))
+    ai_flows_data: list[dict] = []
+    for flow in ai_flow_records:
+        flow_dict = {
+            "slug": flow.slug,
+            "name": flow.name,
+            "framework": flow.framework,
+            "root_path": flow.root_path,
+            "flow_kind": flow.flow_kind,
+            "node_count": flow.node_count,
+            "prompt_files": flow.prompt_files,
+            "state_module": flow.state_module,
+            "graph_files": flow.graph_files,
+            "llm_libs": flow.llm_libs,
+            "confidence": flow.confidence,
+            "prompts": [asdict(p) for p in extract_prompts(repo_root / flow.root_path)],
+        }
+        ai_flows_data.append(flow_dict)
+
+    # v4.3 — cross-flow AI memory + RAG signals.
+    from scripts.architect.ai_memory_detect import detect_memory
+    from scripts.architect.ai_rag_detect import detect_rag
+
+    ai_memory_data = detect_memory(repo_root, ai_flow_records)
+    ai_rag_data = detect_rag(repo_root, ai_flow_records)
 
     scan_report = {
         "files": files,

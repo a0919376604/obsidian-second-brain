@@ -33,8 +33,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   Detector loosened (`scripts/architect/ai_flow.py`): custom-pipeline
   no longer requires `nodes/` dir when LLM provider imports + prompts
-  file present. Fixes "0 AI flows detected" miss on
-  ai-eden-service-style stacks.
+  file present. Additionally, `detect_ai_flows(repo_root,
+  companion_archetype=True)` waives the prompts-file requirement entirely
+  when the companion archetype was detected — covers stacks like
+  ai-eden-service that inline system prompts in provider modules instead
+  of using a top-level `prompts.toml`. `scripts/architect/scan.py` runs
+  companion detection BEFORE `detect_ai_flows` and threads the signal
+  through. Fixes "0 AI flows detected" miss on ai-eden-service-style stacks.
 
   Phase 3.7.5 in command body. Flags `--no-companion` / `--companion-only`.
   Lockfile gains `ai_companion: dict` slot. Roadmap candidate detector
