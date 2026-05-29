@@ -96,6 +96,9 @@ def detect_candidates(project_root: Path) -> list[Candidate]:
     # v4.3: AI memory + RAG cross-flow notes feed roadmap signal via generated blocks.
     out.extend(_extract_ai_cross_flow_candidates(arch))
 
+    # v4.4 — brainstorm session outputs feed roadmap signal.
+    out.extend(_extract_brainstorm_candidates(project_root))
+
     return _dedup(_dedup_candidates(out))
 
 
@@ -275,6 +278,86 @@ def _extract_ai_cross_flow_candidates(arch_root: Path) -> list[Candidate]:
             cand.source = f"{fname}#improvements"
             out.append(cand)
     return out
+
+
+def _extract_brainstorm_candidates(project_root: Path) -> list[Candidate]:
+    """Extract v4.4 candidates from Projects/<P>/Brainstorms/*.md.
+
+    - `distilled-imps` block → `brainstorm-imp` candidates
+      (priority `low` for Confidence speculation/hypothesis, `normal` for stated)
+    - `hypotheses` block → `brainstorm-hypothesis` candidates (always priority `low`)
+
+    Skips brainstorm files whose frontmatter `status: actioned`.
+    """
+    bs_dir = project_root / "Brainstorms"
+    if not bs_dir.is_dir():
+        return []
+    out: list[Candidate] = []
+    for bs_path in sorted(bs_dir.glob("*.md")):
+        try:
+            text = bs_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if _brainstorm_status_actioned(text):
+            continue
+        rel = bs_path.relative_to(project_root).as_posix().replace(".md", "")
+        imp_body = _extract_generated_block(text, "distilled-imps")
+        if imp_body:
+            for entry in _parse_feature_imp_entries(imp_body):
+                priority = (
+                    "low"
+                    if entry["confidence"].lower() in ("speculation", "hypothesis")
+                    else "normal"
+                )
+                cand = _candidate_from_feature_imp(
+                    entry,
+                    rel=rel,
+                    block="distilled-imps",
+                    kind="brainstorm-imp",
+                    priority=priority,
+                )
+                cand.source = f"Brainstorms/{bs_path.name}#distilled-imps"
+                out.append(cand)
+        # hypotheses block — separate candidate type
+        hyp_body = _extract_generated_block(text, "hypotheses")
+        if hyp_body:
+            from scripts.architect.sections import parse_hypothesis_block
+
+            for hyp in parse_hypothesis_block(hyp_body):
+                cand = Candidate(
+                    id=_make_id("brainstorm-hypothesis", _normalize_title(hyp["title"])),
+                    title=hyp["title"],
+                    source_wikilink=f"[[{rel}#hypotheses]]",
+                    source_line=0,
+                    kind="brainstorm-hypothesis",
+                    raw_text=hyp["assumption"],
+                    why=hyp["assumption"],
+                    evidence=[],
+                    effort="?",
+                    risk_if_not_done=hyp["kill_criterion"],
+                    confidence="hypothesis",
+                    candidate_type="brainstorm-hypothesis",
+                    priority="low",
+                    source=f"Brainstorms/{bs_path.name}#hypotheses",
+                )
+                out.append(cand)
+    return out
+
+
+_FRONTMATTER_STATUS_RE = re.compile(r"^status:\s*(\S+)\s*$", re.MULTILINE)
+
+
+def _brainstorm_status_actioned(text: str) -> bool:
+    """Return True iff frontmatter contains `status: actioned`.
+
+    Reads only the first frontmatter block (between two `---` lines).
+    """
+    m = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
+    if not m:
+        return False
+    fm = m.group(1)
+    sm = _FRONTMATTER_STATUS_RE.search(fm)
+    return bool(sm and sm.group(1).strip() == "actioned")
 
 
 def _extract_generated_block(text: str, name: str) -> str | None:

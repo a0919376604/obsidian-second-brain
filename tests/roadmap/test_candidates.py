@@ -458,3 +458,62 @@ def test_detect_candidates_rag_md_embedding_aligned_evidence_raises_priority(tmp
     assert align.priority == "high", (
         f"expected priority=high due to embedding-aligned evidence; got {align.priority}"
     )
+
+
+def test_detect_candidates_walks_brainstorms_distilled_imps(tmp_path):
+    """detect_candidates picks up `distilled-imps` block from
+    Projects/<P>/Brainstorms/*.md."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    (tmp_path / "Architecture").mkdir()
+    bs = tmp_path / "Brainstorms"
+    bs.mkdir()
+    (bs / "2026-05-29-vision-q3.md").write_text(
+        "---\ntype: project-brainstorm\nstatus: fresh\n---\n\n"
+        "## 提煉的 Imps\n"
+        "<!-- @generated:start distilled-imps -->\n"
+        "### Imp 1: Multi-channel inbox 試做\n"
+        "- **為什麼:** 客戶要求 WhatsApp 開始多\n"
+        "- **證據:** [[Architecture/features#missing-features]]\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** 客戶轉投競品\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end distilled-imps -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    multichannel = next((c for c in cands if "Multi-channel" in c.title), None)
+    assert multichannel is not None, (
+        f"brainstorm distilled-imp not picked up; cands={[c.title for c in cands]}"
+    )
+    # Confidence stated → priority normal.
+    assert multichannel.priority == "normal"
+
+
+def test_detect_candidates_brainstorm_hypothesis_confidence_lowers_priority(tmp_path):
+    """When a distilled-imp has Confidence: hypothesis or speculation,
+    priority drops to low."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    (tmp_path / "Architecture").mkdir()
+    bs = tmp_path / "Brainstorms"
+    bs.mkdir()
+    (bs / "2026-05-29-speculative.md").write_text(
+        "---\ntype: project-brainstorm\nstatus: fresh\n---\n\n"
+        "## 提煉的 Imps\n"
+        "<!-- @generated:start distilled-imps -->\n"
+        "### Imp 1: 客戶端 LINE Rich Menu\n"
+        "- **為什麼:** 自助查詢可分流客服 load\n"
+        "- **證據:** [[Architecture/personas#LINE 終端使用者]]\n"
+        "- **Effort:** L\n"
+        "- **未做的風險:** 客服 load 線性成長\n"
+        "- **Confidence:** speculation\n"
+        "<!-- @generated:end distilled-imps -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    rich = next((c for c in cands if "Rich Menu" in c.title), None)
+    assert rich is not None
+    assert rich.priority == "low", (
+        f"speculation confidence should lower priority to low; got {rich.priority}"
+    )
