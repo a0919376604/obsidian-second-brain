@@ -560,3 +560,51 @@ def test_detect_candidates_brainstorm_actioned_status_skipped(tmp_path):
     assert not any("Already graduated" in t for t in titles), (
         f"actioned brainstorm should not be picked up; got {titles}"
     )
+
+
+def test_detect_candidates_dedup_brainstorm_beats_architecture(tmp_path):
+    """When a brainstorm-imp and an architecture-imp share an Evidence wikilink,
+    the brainstorm-imp wins (user-confirmed > Claude-inferred)."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    arch = tmp_path / "Architecture"
+    arch.mkdir()
+    bs = tmp_path / "Brainstorms"
+    bs.mkdir()
+
+    # Architecture-side Imp citing the same Evidence wikilink.
+    (arch / "overview.md").write_text(
+        "---\ntype: architecture-overview\n---\n\n"
+        "## 跨模組改進機會\n"
+        "<!-- @generated:start cross-cutting-improvements -->\n"
+        "### Imp 1: Streaming reply (architecture inferred)\n"
+        "- **為什麼:** llm.invoke 改 stream\n"
+        "- **證據:** [[Architecture/modules/backend]] | [[Architecture/modules/frontend]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** UX 落後\n"
+        "- **Confidence:** medium\n"
+        "<!-- @generated:end cross-cutting-improvements -->\n",
+        encoding="utf-8",
+    )
+    # Brainstorm-side Imp sharing the same Evidence wikilink — should win.
+    (bs / "2026-05-29-streaming.md").write_text(
+        "---\ntype: project-brainstorm\nstatus: fresh\n---\n\n"
+        "## 提煉的 Imps\n"
+        "<!-- @generated:start distilled-imps -->\n"
+        "### Imp 1: Streaming reply (user-confirmed P0)\n"
+        "- **為什麼:** owner Q3 confirm to ship\n"
+        "- **證據:** [[Architecture/modules/backend]] | [[Architecture/modules/frontend]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** 競品先上\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end distilled-imps -->\n",
+        encoding="utf-8",
+    )
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    # Brainstorm-imp must be present.
+    assert any("user-confirmed P0" in t for t in titles), f"got {titles}"
+    # Architecture-imp citing same evidence must be deduped out.
+    assert not any("architecture inferred" in t for t in titles), (
+        f"architecture imp with overlapping evidence should be deduped; got {titles}"
+    )

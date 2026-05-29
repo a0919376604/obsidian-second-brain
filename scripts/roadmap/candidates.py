@@ -544,27 +544,40 @@ def _dedup(cands: list[Candidate]) -> list[Candidate]:
 
 
 def _dedup_candidates(candidates: list[Candidate]) -> list[Candidate]:
-    """Dedup module Imps against features.md Imps when they share Evidence wikilinks.
+    """Dedup Imps when candidates share Evidence wikilinks.
 
-    Features.md (PM lens) wins. Module Imps with overlapping Evidence are dropped.
+    Brainstorms/ (user-confirmed) wins over features.md (PM lens), which wins
+    over architecture/module/decision inferred sources.
     """
-    features_evidence_set: set[str] = set()
+    best_priority_by_wikilink: dict[str, int] = {}
     for c in candidates:
-        if _is_features_candidate(c):
-            for wl in _extract_wikilinks(" | ".join(c.evidence)):
-                features_evidence_set.add(wl)
+        priority = _source_priority(_candidate_source(c))
+        for wl in _extract_wikilinks(" | ".join(c.evidence)):
+            best_priority_by_wikilink[wl] = max(best_priority_by_wikilink.get(wl, 0), priority)
 
     deduped: list[Candidate] = []
     for c in candidates:
-        if _is_features_candidate(c):
-            deduped.append(c)
-            continue
-        # Module / overview / decisions candidates: drop if any evidence wikilink
-        # is in features_evidence_set.
-        if any(wl in features_evidence_set for wl in _extract_wikilinks(" | ".join(c.evidence))):
+        priority = _source_priority(_candidate_source(c))
+        evidence_links = _extract_wikilinks(" | ".join(c.evidence))
+        if any(best_priority_by_wikilink.get(wl, 0) > priority for wl in evidence_links):
             continue
         deduped.append(c)
     return deduped
+
+
+def _candidate_source(candidate: Candidate) -> str:
+    return " ".join(part for part in (candidate.source, candidate.source_wikilink) if part)
+
+
+def _source_priority(source: str) -> int:
+    """Higher = wins in dedup tiebreak."""
+    if not source:
+        return 0
+    if "Brainstorms/" in source:
+        return 30   # v4.4 — user-confirmed beats everything
+    if "features.md" in source or "Architecture/features" in source:
+        return 20   # v4.2 — PM lens beats architecture-inferred
+    return 10       # default: architecture / module / decisions / etc.
 
 
 def _is_features_candidate(candidate: Candidate) -> bool:
