@@ -152,3 +152,42 @@ def test_local_evidence_wins_over_repo_dep(tmp_path: Path):
         f"expected custom-pipeline (local code imports openai, not langgraph); got {f.framework}"
     assert f.root_path == "modules/qa_to_kb"
     assert any("prompts.toml" in p for p in f.prompt_files)
+
+
+def test_custom_pipeline_detected_without_nodes_dir_when_llm_imports(tmp_path: Path):
+    """Repro: ai-eden-service has app/pipeline.py + LLM provider imports but
+    no nodes/ dir. Should still detect as custom-pipeline."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "m"\ndependencies = ["openai"]\n', encoding="utf-8"
+    )
+    app = tmp_path / "app"
+    (app / "providers").mkdir(parents=True)
+    (app / "providers" / "openai_provider.py").write_text(
+        "from openai import OpenAI\nclient = OpenAI()\n", encoding="utf-8"
+    )
+    (app / "pipeline.py").write_text(
+        "from app.providers.openai_provider import client\n"
+        "def run(): return client.chat.completions.create(messages=[])\n",
+        encoding="utf-8",
+    )
+    (app / "prompts.toml").write_text(
+        '[system]\nbody = "You are an assistant"\n', encoding="utf-8"
+    )
+    from scripts.architect.ai_flow import detect_ai_flows
+    flows = detect_ai_flows(tmp_path)
+    assert len(flows) == 1
+    assert flows[0].framework == "custom-pipeline"
+
+
+def test_custom_pipeline_still_requires_pipeline_file(tmp_path: Path):
+    """Sanity: openai imports + no pipeline.py → not a flow."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "m"\ndependencies = ["openai"]\n', encoding="utf-8"
+    )
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "main.py").write_text(
+        "from openai import OpenAI\ndef hello(): pass\n", encoding="utf-8"
+    )
+    from scripts.architect.ai_flow import detect_ai_flows
+    flows = detect_ai_flows(tmp_path)
+    assert flows == []

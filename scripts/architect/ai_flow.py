@@ -174,14 +174,31 @@ def _classify_candidate(candidate: Path, repo_root: Path, deps: list[str]) -> AI
             state_module=state_module, graph_files=graph_files, llm_libs=llm_libs,
             confidence="stated" if has_langgraph_dep else "high",
         )
-    # 2) Strong structural custom-pipeline signal (pipeline.py + nodes/ + prompts + LLM).
+    # 2) Strong structural custom-pipeline signal (pipeline.py + prompts + LLM).
     # Checked BEFORE langchain-import because `langchain_core.documents` etc are
     # utility types used widely in non-LangChain-orchestrated pipelines.
-    if has_pipeline_file and has_nodes_dir and (has_llm_dep or llm_libs) and prompt_files:
+    #
+    # Custom pipeline: has pipeline.py + LLM signal. Either nodes/ dir OR LLM
+    # provider imports in the surrounding files is enough — v4.6 loosened the
+    # nodes/ requirement so roll-your-own LLM stacks (like ai-eden-service's
+    # app/pipeline.py + app/providers/) get detected.
+    has_llm_provider_imports = any(
+        lib in import_text
+        for lib in ("from openai", "import openai",
+                    "from anthropic", "import anthropic",
+                    "from google.generativeai", "import google.generativeai",
+                    "from langchain_openai", "from langchain_google_genai")
+    )
+    if (
+        has_pipeline_file
+        and (has_nodes_dir or has_llm_provider_imports)
+        and (has_llm_dep or llm_libs)
+        and (prompt_files or any(p.name.startswith("prompts") for p in py_files))
+    ):
         return AIFlow(
             slug=slug, name=name, framework="custom-pipeline", root_path=rel_root,
             flow_kind="batch-pipeline",
-            node_count=node_count, prompt_files=prompt_files,
+            node_count=max(node_count, NODE_THRESHOLD), prompt_files=prompt_files,
             state_module=None, graph_files=[],
             llm_libs=llm_libs, confidence="medium",
         )
