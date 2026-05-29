@@ -48,6 +48,9 @@ SECTION_TYPES = {
     "jobs": "architecture-jobs",
     "flows": "architecture-flows",
     "ai-flow": "architecture-ai-flow",
+    # v4.3 cross-flow lenses
+    "ai-memory": "architecture-ai-memory",
+    "ai-rag": "architecture-ai-rag",
 }
 
 
@@ -189,6 +192,34 @@ _BLOCK_NAMES = {
         "improvements",
         "dependencies",
     ),
+    # v4.3 — cross-flow AI memory lens (lifecycle / TTL / compaction).
+    "ai-memory": (
+        "summary",
+        "flow-memory-map",
+        "backend-and-storage",
+        "scope-and-lifecycle",
+        "context-window-management",
+        "compaction-strategy",
+        "long-term-vs-short",
+        "strengths",
+        "weaknesses",
+        "improvements",
+        "dependencies",
+    ),
+    # v4.3 — cross-flow RAG lens (ingest → store → retrieve).
+    "ai-rag": (
+        "summary",
+        "rag-data-flow",
+        "ingest-pipeline",
+        "vector-store-config",
+        "retrieve-strategy",
+        "embedding-providers",
+        "evaluation",
+        "strengths",
+        "weaknesses",
+        "improvements",
+        "dependencies",
+    ),
 }
 
 # v4 — these sections are still callable for backward compat but no longer
@@ -253,6 +284,19 @@ _BLOCK_HEADINGS = {
     "prompts": "## Prompts",
     "llm-config": "## LLM config",
     "evaluation": "## Evaluation & observability",
+    # v4.3 memory block headings
+    "flow-memory-map": "## Per-flow memory map",
+    "backend-and-storage": "## Backend & storage",
+    "scope-and-lifecycle": "## Scope & lifecycle",
+    "context-window-management": "## Context window management",
+    "compaction-strategy": "## Compaction strategy",
+    "long-term-vs-short": "## Long-term vs short-term memory",
+    # v4.3 rag block headings
+    "rag-data-flow": "## RAG data flow",
+    "ingest-pipeline": "## Ingest pipeline",
+    "vector-store-config": "## Vector store config",
+    "retrieve-strategy": "## Retrieve strategy",
+    "embedding-providers": "## Embedding providers",
 }
 
 
@@ -379,6 +423,8 @@ def _preamble_for(section: str, lang: str) -> str:
             "jobs": "本檔列出 codebase 為使用者完成的工作 (jobs to be done)。",
             "flows": "本檔列出橫跨模組的關鍵使用者流程或資料流。",
             "ai-flow": "本檔是單一 AI 流程的深判斷 — 包含 graph 結構、state schema、prompts 全文、LLM 設定、評估與設計優缺點。",
+            "ai-memory": "本檔是 AI 記憶層的跨流程深判斷 — lifecycle、TTL、compaction、context window 管理。Per-flow state shape 請見 [[Architecture/ai-flows/<slug>#State schema]]。",
+            "ai-rag": "本檔是 RAG (retrieval-augmented generation) 跨流程管線深判斷 — ingest → vector store → retrieve、embedding 對齊、評估。Per-flow LLM 設定請見 [[Architecture/ai-flows/<slug>#LLM config]]。",
         }[section]
     return {
         "api-surface": "This is the API surface reference. Look up commands or endpoints here.",
@@ -391,6 +437,8 @@ def _preamble_for(section: str, lang: str) -> str:
         "jobs": "Jobs to be done that this codebase fulfills for users.",
         "flows": "Cross-module user flows or data flows of note.",
         "ai-flow": "Deep judgment for a single AI flow — graph topology, state schema, full prompts, LLM config, evaluation, and design pros/cons.",
+        "ai-memory": "Cross-flow AI memory lens — lifecycle, TTL, compaction, context window management. For per-flow state shape see [[Architecture/ai-flows/<slug>#State schema]].",
+        "ai-rag": "Cross-flow RAG (retrieval-augmented generation) lens — ingest → vector store → retrieve, embedding alignment, evaluation. For per-flow LLM config see [[Architecture/ai-flows/<slug>#LLM config]].",
     }[section]
 
 

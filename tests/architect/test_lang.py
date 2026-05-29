@@ -147,3 +147,26 @@ def test_heading_map_includes_ai_flow_keys():
         assert en in HEADING_MAP, f"missing heading key {en!r}"
         assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
         assert HEADING_MAP[en]["en"] == en
+
+
+def test_heading_map_includes_v4_3_keys():
+    """v4.3 introduces 10 new H2 headings across memory.md + rag.md."""
+    from scripts.architect.lang import HEADING_MAP
+    required = {
+        # memory.md
+        "## Per-flow memory map": "## 各流程記憶機制",
+        "## Backend & storage": "## 儲存層",
+        "## Scope & lifecycle": "## 範疇與生命週期",
+        "## Context window management": "## Context window 管理",
+        "## Compaction strategy": "## 壓縮策略",
+        "## Long-term vs short-term memory": "## 長期 vs 短期記憶",
+        # rag.md
+        "## RAG data flow": "## RAG 資料流",
+        "## Ingest pipeline": "## Ingest 管線",
+        "## Vector store config": "## Vector store 設定",
+        "## Retrieve strategy": "## Retrieve 策略",
+    }
+    for en, zh in required.items():
+        assert en in HEADING_MAP, f"missing heading key {en!r}"
+        assert HEADING_MAP[en]["zh-TW"] == zh, f"{en} should map to {zh!r}"
+        assert HEADING_MAP[en]["en"] == en

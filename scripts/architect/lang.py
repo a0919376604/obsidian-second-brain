@@ -128,6 +128,24 @@ HEADING_MAP: dict[str, dict[str, str]] = {
         "zh-TW": "## 可加 features (gap analysis)",
     },
     "## Doc sync actions": {"en": "## Doc sync actions", "zh-TW": "## 文件補補丁"},
+    # v4.3 memory.md cross-flow lens
+    "## Per-flow memory map": {"en": "## Per-flow memory map", "zh-TW": "## 各流程記憶機制"},
+    "## Backend & storage": {"en": "## Backend & storage", "zh-TW": "## 儲存層"},
+    "## Scope & lifecycle": {"en": "## Scope & lifecycle", "zh-TW": "## 範疇與生命週期"},
+    "## Context window management": {
+        "en": "## Context window management",
+        "zh-TW": "## Context window 管理",
+    },
+    "## Compaction strategy": {"en": "## Compaction strategy", "zh-TW": "## 壓縮策略"},
+    "## Long-term vs short-term memory": {
+        "en": "## Long-term vs short-term memory",
+        "zh-TW": "## 長期 vs 短期記憶",
+    },
+    # v4.3 rag.md cross-flow lens
+    "## RAG data flow": {"en": "## RAG data flow", "zh-TW": "## RAG 資料流"},
+    "## Ingest pipeline": {"en": "## Ingest pipeline", "zh-TW": "## Ingest 管線"},
+    "## Vector store config": {"en": "## Vector store config", "zh-TW": "## Vector store 設定"},
+    "## Retrieve strategy": {"en": "## Retrieve strategy", "zh-TW": "## Retrieve 策略"},
 }
 
 
