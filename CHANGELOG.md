@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `/obsidian-architect` v4.3 — `ai-flows/memory.md` + `ai-flows/rag.md` cross-flow
+  notes. Per spec
+  `docs/superpowers/specs/2026-05-28-obsidian-architect-v4.3-ai-memory-rag-design.md`.
+  Adds `ai_memory_detect.py` (langgraph checkpointer + langchain memory + reducer
+  cap extraction), `ai_rag_detect.py` (vector store + embedding lib + 3-state
+  embedding_aligned check), 4 new sections.py helpers (`build_ai_memory_prompt`,
+  `build_ai_rag_prompt`, `compose_ai_memory_note`, `compose_ai_rag_note`),
+  Lockfile `ai_memory` + `ai_rag` slots (additive), roadmap candidate walks for
+  `ai-memory-improvement` + `ai-rag-improvement` (priority `high` when
+  `embedding-aligned` evidence cited).
 - `/obsidian-architect` v4.2 — `features.md` as product PM lens. Per spec
   `docs/superpowers/specs/2026-05-28-obsidian-architect-v4.2-features-design.md`.
   Adds `research_walker.py`, `git_history.py`, `build_features_prompt`,

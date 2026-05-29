@@ -540,6 +540,13 @@ Steps:
   PM-voice strengths/weaknesses/limitations, doc-sync action todos. Frontmatter
   carries `feature-count` / `deprecated-count` / `doc-sync-score` for cross-
   project DataView aggregation. Flags `--no-features` / `--features-only`.
+- **v4.3 (2026-05-28):** Adds two **cross-flow** AI architecture notes when ≥1 AI
+  flow detected: `ai-flows/memory.md` (lifecycle / TTL / compaction / context
+  window management) and `ai-flows/rag.md` (ingest → vector store → retrieve;
+  embedding alignment check). Frontmatter `embedding-aligned: false` is the
+  flagship cross-project DataView field — shows misaligned embedding providers
+  between write side (qa_to_kb-style) and read side (engines-style). Flags
+  `--no-ai-memory` / `--no-ai-rag` / `--ai-memory-only` / `--ai-rag-only`.
 
 ---
 

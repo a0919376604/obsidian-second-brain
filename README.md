@@ -274,7 +274,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 | `/obsidian-review` | Structured weekly or monthly review |
 | `/obsidian-board` | Kanban board view and updates |
 | `/obsidian-project` | Project note with board and daily links |
-| `/obsidian-architect` | Scan codebase + generate v4 architecture report (8 files) + v4.1 AI flows layer + v4.2 product features lens (online/deprecated, gap analysis, doc-sync drift) |
+| `/obsidian-architect` | Scan codebase + generate v4 architecture report (8 files) + v4.1 AI flows layer + v4.2 product features lens + v4.3 AI memory + RAG cross-flow notes (lifecycle, embedding alignment) |
 | `/obsidian-health` | Vault audit -- contradictions, gaps, stale claims, orphans |
 | `/obsidian-adr` | Decision records -- the vault knows why it's structured this way |
 | `/obsidian-visualize` | Generates a visual canvas map — see the shape of your second brain |
