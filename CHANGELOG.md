@@ -18,6 +18,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `/obsidian-architect` v4.6 — AI companion archetype detection + 4-layer
+  schema. Per spec
+  `docs/superpowers/specs/2026-05-29-obsidian-architect-v4.6-companion-archetype-design.md`.
+
+  New module: `scripts/architect/companion_detect.py` with
+  `detect_companion_archetype()` + `CompanionDetection` + `LayerEvidence`
+  dataclasses. Auto-detect rule: character + storyline both present.
+  Frontmatter `archetype: ai-companion` override.
+
+  4 new section types: `character-card` (9 blocks) / `world` (10) /
+  `storyline` (11) / `companion-overview` (9). 19 new heading mappings
+  in `lang.py` with zh-TW translations.
+
+  Detector loosened (`scripts/architect/ai_flow.py`): custom-pipeline
+  no longer requires `nodes/` dir when LLM provider imports + prompts
+  file present. Fixes "0 AI flows detected" miss on
+  ai-eden-service-style stacks.
+
+  Phase 3.7.5 in command body. Flags `--no-companion` / `--companion-only`.
+  Lockfile gains `ai_companion: dict` slot. Roadmap candidate detector
+  walks 3 new files; companion-overview Imp citing ≥2 layer wikilinks
+  → priority `high`.
+
 - `scripts/board/refresh.py` — shared `refresh_board(project_dir,
   signals=None, full=False)` helper. Walks git log + spec/plan files
   when signals=None (cron path), reuses caller-provided signals dict

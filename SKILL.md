@@ -342,7 +342,7 @@ These slash commands can be used in any Claude surface. Each one is smart — it
 
 | Command | What it does |
 |---|---|
-| `/obsidian-architect <repo>` | Scan codebase + generate v4 architecture report + AI flows + features lens + memory/RAG cross-flow (v4.3 family) (v4.5: also auto-refreshes Projects/<P>/board.md as Phase 7, opt-out via --no-board-refresh) |
+| `/obsidian-architect <repo>` | Scan codebase + generate v4 architecture report + AI flows + features lens + memory/RAG cross-flow (v4.3 family) + v4.6 AI companion archetype (v4.5: also auto-refreshes Projects/<P>/board.md as Phase 7, opt-out via --no-board-refresh) |
 | `/obsidian-brainstorm <repo>` | Interview-style brainstorm — 4-6 provocations, drill via follow-ups, distill into Brainstorms/ session file |
 | `/obsidian-roadmap <repo>` | Synthesize Architecture + Research + Brainstorms signals into Roadmap.md + T-NNN tasks |
 | `/obsidian-research <repo> <topic>` | Free-source web + academic research (use `global` as `<repo>` for vault-wide) |
@@ -559,6 +559,12 @@ Steps:
   flagship cross-project DataView field — shows misaligned embedding providers
   between write side (qa_to_kb-style) and read side (engines-style). Flags
   `--no-ai-memory` / `--no-ai-rag` / `--ai-memory-only` / `--ai-rag-only`.
+- **v4.6 (2026-05-29):** Adds AI companion-bot **archetype detection** + 4-layer
+  schema (Character Card / World / Storyline + reuse v4.3 Memory) + cross-cutting
+  companion-overview. Auto-detect requires character + storyline both present;
+  `archetype: ai-companion` frontmatter override available. Phase 3.7.5 in
+  command body. Flags `--no-companion` / `--companion-only`. Detector bug
+  fixed: custom-pipeline no longer requires `nodes/` dir.
 
 ---
 
