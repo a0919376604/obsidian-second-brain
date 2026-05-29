@@ -271,3 +271,93 @@ def test_compose_ai_rag_note_emits_embedding_aligned_bool_or_null():
         embedding_aligned=True,
     )
     assert "embedding-aligned: true" in note_true
+
+
+def test_scan_report_includes_ai_memory_and_ai_rag(tmp_path):
+    """build_scan_report exposes ai_memory + ai_rag dicts when ai_flows detected."""
+    import subprocess
+    import os
+    from scripts.architect.scan import build_scan_report
+
+    # Set up a minimal repo + LangGraph flow with checkpointer.
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    (tmp_path / "README.md").write_text("r\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("a\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname="m"\ndependencies=["langgraph"]\n',
+        encoding="utf-8",
+    )
+    flow = tmp_path / "app"
+    (flow / "nodes").mkdir(parents=True)
+    for n in ("intent", "retrieve", "generate"):
+        (flow / "nodes" / f"{n}.py").write_text(
+            f"def {n}(s): return s\n",
+            encoding="utf-8",
+        )
+    (flow / "prompts").mkdir()
+    (flow / "prompts" / "system.py").write_text('SYSTEM = "x"\n', encoding="utf-8")
+    (flow / "core").mkdir()
+    (flow / "core" / "state.py").write_text("class S: pass\n", encoding="utf-8")
+    (flow / "graph.py").write_text(
+        "from langgraph.checkpoint.memory import MemorySaver\n"
+        "from langgraph.graph import StateGraph\n"
+        "checkpointer = MemorySaver()\n"
+        "g = StateGraph(dict)\n"
+        "g.add_node('intent', None)\n"
+        "g.add_node('retrieve', None)\n"
+        "g.add_node('generate', None)\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_DATE": "2026-05-28T00:00:00",
+             "GIT_COMMITTER_DATE": "2026-05-28T00:00:00"},
+    )
+
+    report = build_scan_report(tmp_path, vault_project_dir=None)
+    assert "ai_memory" in report
+    assert "ai_rag" in report
+    # The flow was detected; pick whichever slug landed.
+    fm_slugs = list(report["ai_memory"]["per_flow"].keys())
+    assert fm_slugs, f"expected at least one per-flow record; got {fm_slugs}"
+    fr_slugs = list(report["ai_rag"]["per_flow"].keys())
+    assert fr_slugs == fm_slugs, "memory + rag must cover same set of flows"
+    # in-memory backend detected via MemorySaver.
+    sole = report["ai_memory"]["per_flow"][fm_slugs[0]]
+    assert sole["has_memory"] is True
+    assert "in-memory" in sole["backends"]
+
+
+def test_scan_report_ai_memory_ai_rag_empty_when_no_ai_flows(tmp_path):
+    """No AI flows → both keys present with empty per_flow + zero counts."""
+    import subprocess
+    import os
+    from scripts.architect.scan import build_scan_report
+
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("r\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("a\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("def hello(): pass\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=tmp_path, check=True, capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_DATE": "2026-05-28T00:00:00",
+             "GIT_COMMITTER_DATE": "2026-05-28T00:00:00"},
+    )
+
+    report = build_scan_report(tmp_path, vault_project_dir=None)
+    assert report["ai_memory"]["per_flow"] == {}
+    assert report["ai_memory"]["summary"]["memory_flows"] == 0
+    assert report["ai_rag"]["per_flow"] == {}
+    assert report["ai_rag"]["summary"]["read_flows"] == 0
+    assert report["ai_rag"]["summary"]["embedding_aligned"] is None

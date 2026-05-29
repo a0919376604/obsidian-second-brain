@@ -82,8 +82,9 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
     commit_decisions = [asdict(c) for c in extract_commit_decisions(repo_root, limit=200)]
 
     # AI flow detection + per-flow prompt extraction (v4.1).
+    ai_flow_records = list(detect_ai_flows(repo_root))
     ai_flows_data: list[dict] = []
-    for flow in detect_ai_flows(repo_root):
+    for flow in ai_flow_records:
         flow_dict = {
             "slug": flow.slug,
             "name": flow.name,
@@ -99,6 +100,13 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
             "prompts": [asdict(p) for p in extract_prompts(repo_root / flow.root_path)],
         }
         ai_flows_data.append(flow_dict)
+
+    # v4.3 — cross-flow AI memory + RAG signals.
+    from scripts.architect.ai_memory_detect import detect_memory
+    from scripts.architect.ai_rag_detect import detect_rag
+
+    ai_memory_data = detect_memory(repo_root, ai_flow_records)
+    ai_rag_data = detect_rag(repo_root, ai_flow_records)
 
     scan_report = {
         "files": files,
@@ -117,6 +125,9 @@ def run_phase_one(repo_root: Path, vault_project_dir: Path | None = None) -> Sca
         "api_surface": _api_surface_to_dict(api_surface),
         "commit_decisions": commit_decisions,
         "ai_flows": ai_flows_data,
+        # v4.3 — cross-flow lenses.
+        "ai_memory": ai_memory_data,
+        "ai_rag": ai_rag_data,
     }
     _add_features_inputs(scan_report, repo_root, vault_project_dir)
 
