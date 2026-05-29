@@ -517,3 +517,46 @@ def test_detect_candidates_brainstorm_hypothesis_confidence_lowers_priority(tmp_
     assert rich.priority == "low", (
         f"speculation confidence should lower priority to low; got {rich.priority}"
     )
+
+
+def test_detect_candidates_brainstorm_actioned_status_skipped(tmp_path):
+    """A brainstorm file with frontmatter `status: actioned` is NOT walked."""
+    from scripts.roadmap.candidates import detect_candidates
+
+    (tmp_path / "Architecture").mkdir()
+    bs = tmp_path / "Brainstorms"
+    bs.mkdir()
+    (bs / "2026-04-01-already-done.md").write_text(
+        "---\ntype: project-brainstorm\nstatus: actioned\n---\n\n"
+        "## 提煉的 Imps\n"
+        "<!-- @generated:start distilled-imps -->\n"
+        "### Imp 1: Already graduated\n"
+        "- **為什麼:** done\n"
+        "- **證據:** [[x]]\n"
+        "- **Effort:** S\n"
+        "- **未做的風險:** none\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end distilled-imps -->\n",
+        encoding="utf-8",
+    )
+    # Also add a fresh one to confirm the WALK still works for non-actioned files.
+    (bs / "2026-05-29-fresh.md").write_text(
+        "---\ntype: project-brainstorm\nstatus: fresh\n---\n\n"
+        "## 提煉的 Imps\n"
+        "<!-- @generated:start distilled-imps -->\n"
+        "### Imp 1: Still in flight\n"
+        "- **為什麼:** not done\n"
+        "- **證據:** [[y]]\n"
+        "- **Effort:** M\n"
+        "- **未做的風險:** drift\n"
+        "- **Confidence:** stated\n"
+        "<!-- @generated:end distilled-imps -->\n",
+        encoding="utf-8",
+    )
+
+    cands = detect_candidates(tmp_path)
+    titles = [c.title for c in cands]
+    assert "Imp 1: Still in flight" in titles or "Still in flight" in titles
+    assert not any("Already graduated" in t for t in titles), (
+        f"actioned brainstorm should not be picked up; got {titles}"
+    )
