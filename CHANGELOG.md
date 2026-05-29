@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `/obsidian-brainstorm` - new slash command for "stuck on next step"
+  sessions. Per spec
+  `docs/superpowers/specs/2026-05-29-obsidian-brainstorm-design.md`.
+  Claude reads vault (Architecture/* + features + ai-flows + personas +
+  decisions + Research + board + recent Logs + past brainstorms) and
+  opens with 4-6 bold provocations (gap / persona / trend / premortem
+  lens). User reacts (drill / kill / park / rewrite); Claude drills via
+  follow-ups. Output: `Projects/<P>/Brainstorms/YYYY-MM-DD-<slug>.md`
+  with 9 @generated blocks (context, opening-provocations,
+  drilled-explorations, distilled-imps, hypotheses, parked,
+  open-questions, meta-reflection, dependencies). `/obsidian-roadmap`
+  picks up `distilled-imps` + `hypotheses` blocks automatically; new
+  dedup rule prefers Brainstorms/ source over features.md and
+  architecture-inferred sources.
+
+  New helpers: `parse_hypothesis_block` and `compose_brainstorm_note`
+  in `scripts/architect/sections.py`. 8 new heading mappings in
+  `scripts/architect/lang.py`. Roadmap candidate detector extension
+  in `scripts/roadmap/candidates.py:_extract_brainstorm_candidates`.
 - `/obsidian-architect` v4.3 — `ai-flows/memory.md` + `ai-flows/rag.md` cross-flow
   notes. Per spec
   `docs/superpowers/specs/2026-05-28-obsidian-architect-v4.3-ai-memory-rag-design.md`.

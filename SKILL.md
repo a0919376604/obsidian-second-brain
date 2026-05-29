@@ -681,6 +681,7 @@ These commands use the vault as a thinking partner — not just storage. They su
   cards. Three layers: architecture (descriptive) → roadmap (prescriptive)
   → tasks (atomic). Idempotent via `_roadmap.lock.json`; supports vault-wide
   zh-TW via `_CLAUDE.md output-lang`.
+- `/obsidian-brainstorm` - 卡住、不知道下一步該做什麼時,interview-style brainstorm。Claude 讀整個 vault(Architecture/* + features + ai-flows + personas + decisions + Research + board + 最近 Logs + 過去 brainstorms)後,丟出 4-6 個大膽的下個方向(混 gap / persona / trend / premortem lens),使用者反應後深挖,蒸餾成 ImprovementItem + 待驗證假設,寫進 `Projects/<P>/Brainstorms/YYYY-MM-DD-<slug>.md`,自動被 `/obsidian-roadmap` 撿走。Flags: `--topic` / `--lens` / `--depth=quick|medium|deep` / `--research-window-days`。
 
 ---
 
