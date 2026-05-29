@@ -18,6 +18,7 @@ from pathlib import Path
 
 
 _GLOBAL_SENTINELS = ("global", "_", "-")
+_LOCAL_PATH_RE = re.compile(r'^local-path:\s*"?(?P<path>[^"\n]+)"?\s*$', re.MULTILINE)
 
 
 @dataclass
@@ -75,11 +76,63 @@ def _list_projects(vault_root: Path) -> list[str]:
 
 
 def _resolve_absolute_path(token: str, vault_root: Path) -> RepoResolution:
-    """Placeholder filled in by Task 2."""
+    """Walk Projects/*/<P>.md hubs; match by local-path frontmatter."""
+    normalized = token.rstrip("/")
+    projects_dir = vault_root / "Projects"
+    if not projects_dir.is_dir():
+        return RepoResolution(
+            state="unknown",
+            candidates=[],
+            message="vault has no Projects/ folder",
+        )
+
+    matches: list[tuple[str, Path, str]] = []
+    for proj_dir in projects_dir.iterdir():
+        if not proj_dir.is_dir() or proj_dir.name.startswith((".", "_")):
+            continue
+        hub_path = proj_dir / f"{proj_dir.name}.md"
+        if not hub_path.is_file():
+            continue
+        try:
+            text = hub_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        fm_match = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
+        if not fm_match:
+            continue
+        fm = fm_match.group(1)
+        for match in _LOCAL_PATH_RE.finditer(fm):
+            path_value = match.group("path").strip().rstrip("/")
+            if path_value == normalized:
+                matches.append((proj_dir.name, proj_dir, path_value))
+                break
+
+    if len(matches) == 0:
+        return RepoResolution(
+            state="unknown",
+            candidates=_list_projects(vault_root),
+            message=(
+                f"no project hub binds to local-path {token!r}. "
+                "Either fix the project hub's frontmatter, or pass the project name "
+                "as the <repo> argument instead."
+            ),
+        )
+    if len(matches) == 1:
+        slug, proj_dir, local_path = matches[0]
+        return RepoResolution(
+            state="project",
+            project_slug=slug,
+            project_dir=proj_dir,
+            local_path=local_path,
+        )
     return RepoResolution(
-        state="unknown",
-        candidates=_list_projects(vault_root),
-        message=f"absolute-path resolution not yet implemented for token: {token}",
+        state="ambiguous",
+        candidates=[match[0] for match in matches],
+        message=(
+            f"path {token!r} is bound by multiple project hubs: "
+            f"{[match[0] for match in matches]}. Use --project=<name> or pass the "
+            "project name directly to disambiguate."
+        ),
     )
 
 

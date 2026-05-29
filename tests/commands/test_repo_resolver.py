@@ -55,3 +55,61 @@ def test_resolve_repo_arg_global_rejected_when_not_allowed(tmp_path: Path):
     res = resolve_repo_arg("global", vault_root=vault, allow_global=False)
     assert res.state == "unknown"
     assert "global" in res.message.lower() or "not allowed" in res.message.lower()
+
+
+def test_resolve_repo_arg_absolute_path_single_match(tmp_path: Path):
+    """Absolute path matches one hub's local-path -> state='project'."""
+    vault = _make_vault(tmp_path, ["langlive-line-oa"])
+    (vault / "Projects/langlive-line-oa/langlive-line-oa.md").write_text(
+        "---\n"
+        "type: project\n"
+        'project: "[[langlive-line-oa]]"\n'
+        'local-path: "/Users/leric/Desktop/code/langlive-line-oa"\n'
+        "---\n",
+        encoding="utf-8",
+    )
+    res = resolve_repo_arg(
+        "/Users/leric/Desktop/code/langlive-line-oa",
+        vault_root=vault,
+        allow_global=False,
+    )
+    assert res.state == "project"
+    assert res.project_slug == "langlive-line-oa"
+    assert res.local_path == "/Users/leric/Desktop/code/langlive-line-oa"
+
+
+def test_resolve_repo_arg_absolute_path_no_match(tmp_path: Path):
+    """Absolute path with no matching hub -> state='unknown'."""
+    vault = _make_vault(tmp_path, ["langlive-line-oa"])
+    (vault / "Projects/langlive-line-oa/langlive-line-oa.md").write_text(
+        "---\n"
+        'local-path: "/some/other/path"\n'
+        "---\n",
+        encoding="utf-8",
+    )
+    res = resolve_repo_arg(
+        "/Users/leric/Desktop/code/nonexistent",
+        vault_root=vault,
+        allow_global=False,
+    )
+    assert res.state == "unknown"
+    assert "nonexistent" in res.message or "no project hub" in res.message.lower()
+
+
+def test_resolve_repo_arg_absolute_path_multiple_match(tmp_path: Path):
+    """Absolute path matches multiple hubs -> state='ambiguous'."""
+    vault = _make_vault(tmp_path, ["proj-a", "proj-b"])
+    for name in ("proj-a", "proj-b"):
+        (vault / f"Projects/{name}/{name}.md").write_text(
+            "---\n"
+            'local-path: "/Users/x/shared-repo"\n'
+            "---\n",
+            encoding="utf-8",
+        )
+    res = resolve_repo_arg(
+        "/Users/x/shared-repo",
+        vault_root=vault,
+        allow_global=False,
+    )
+    assert res.state == "ambiguous"
+    assert set(res.candidates) == {"proj-a", "proj-b"}
