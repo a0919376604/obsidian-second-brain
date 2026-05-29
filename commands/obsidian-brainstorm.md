@@ -1,26 +1,54 @@
 ---
 description: Interview-style brainstorm: Claude reads vault, opens with 4-6 bold next-direction provocations, drills via follow-ups, distills into a session file feeding /obsidian-roadmap
-argument-hint: <project-name>
+argument-hint: <repo>
 category: thinking
 triggers_en: ["brainstorm project", "obsidian brainstorm", "what should I work on", "stuck on next step"]
+param-autocomplete:
+  - name: repo
+    source: vault-projects
 ---
 
 Use the obsidian-second-brain skill. Execute `/obsidian-brainstorm $ARGUMENTS`:
 
-The argument is `<project-name>` (folder under `Projects/`). Optional flags:
+The first argument is `<repo>` (project name or absolute path bound by hub `local-path`). Optional flags:
 - `--topic="<seed>"`: narrow the provocation focus (e.g. `--topic="客戶流失"`)
 - `--lens=gap|persona|trend|premortem|mix`: provocation flavor; default `mix` (1-2 each, 4-6 total)
 - `--depth=quick|medium|deep`: `quick` = open + react only; `medium` = drill 1-2 (default); `deep` = drill all
 - `--lang=zh-TW|en`: override vault `_CLAUDE.md output-lang`
 - `--research-window-days=N`: read Research/ window, default 30
 
-If `<project-name>` is omitted and `pwd` is inside `Projects/<P>/`, default to `<P>`. Otherwise ASK the user which project.
-
-## Phase 0: Pre-flight
+## Phase 0: Pre-flight + resolve <repo>
 
 - Confirm vault root has `_CLAUDE.md`. If no, abort with "Run /obsidian-init first."
-- Confirm `Projects/<P>/` exists. If no, abort with "Run /obsidian-project <P> first."
-- Ensure `Projects/<P>/Brainstorms/` exists (mkdir if needed).
+- Parse the first whitespace-delimited token from `$ARGUMENTS` as the `<repo>` argument. Anything after is treated as flags.
+- Resolve via shared helper:
+
+```python
+import shlex
+tokens = shlex.split(args, posix=True)
+if not tokens:
+    abort("missing <repo> argument. Usage: /obsidian-brainstorm <repo> [--topic=...] [--lens=...] [--depth=...]")
+repo_token = tokens[0]
+remaining_flags = tokens[1:]
+
+from scripts.commands.repo_resolver import resolve_repo_arg
+resolution = resolve_repo_arg(
+    repo_token,
+    vault_root=Path("~/Documents/SecondBrain").expanduser(),
+    allow_global=False,   # brainstorm requires a real project
+)
+
+if resolution.state == "project":
+    project_dir = resolution.project_dir
+    project_slug = resolution.project_slug
+elif resolution.state == "ambiguous":
+    ask_user_to_pick(resolution.candidates)
+elif resolution.state == "unknown" or resolution.state == "global":
+    abort(resolution.message)  # 'global' is rejected for brainstorm
+```
+
+- Confirm `Projects/<project_slug>/` exists. If no, abort with "Run /obsidian-project <P> first."
+- Ensure `Projects/<project_slug>/Brainstorms/` exists (mkdir if needed).
 - Resolve `output_lang`:
   ```bash
   uv run python -c "from scripts.architect.lang import resolve_output_lang; from pathlib import Path; import sys; print(resolve_output_lang(sys.argv[1] or None, Path(sys.argv[2])))" "${LANG_FLAG:-}" "<vault-root>"
