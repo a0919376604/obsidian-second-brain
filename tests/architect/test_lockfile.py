@@ -307,3 +307,45 @@ def test_lockfile_sections_features_slot_round_trip(tmp_path):
     assert loaded.sections["features"]["feature-count"] == 32
     assert loaded.sections["features"]["doc-sync-score"] == 0.87
     assert loaded.sections["features"]["signal-hash"] == "sha256:abc123"
+
+
+def test_lockfile_ai_memory_slot_round_trip(tmp_path):
+    """sections.ai_memory round-trips through Lockfile.save → load (v4.3)."""
+    from scripts.architect.lockfile import Lockfile
+
+    lock = Lockfile(version=4, scanner_version="0.2.0", frame="report-v4")
+    lock.ai_memory = {
+        "signal-hash": "sha256:abc",
+        "lang": "zh-TW",
+        "last-generated": "2026-05-29",
+        "commit": "d4f5",
+        "memory_flows": 1,
+        "stateless_flows": 1,
+        "backend": "redis",
+    }
+    p = tmp_path / "_manifest.lock.json"
+    lock.save(p)
+    loaded = Lockfile.load(p)
+    assert loaded.ai_memory["memory_flows"] == 1
+    assert loaded.ai_memory["backend"] == "redis"
+
+
+def test_lockfile_ai_rag_slot_round_trip(tmp_path):
+    from scripts.architect.lockfile import Lockfile
+
+    lock = Lockfile(version=4, scanner_version="0.2.0", frame="report-v4")
+    lock.ai_rag = {
+        "signal-hash": "sha256:def",
+        "lang": "zh-TW",
+        "last-generated": "2026-05-29",
+        "commit": "d4f5",
+        "rag_flows_read": 1,
+        "rag_flows_write": 1,
+        "vector_store": "weaviate",
+        "embedding_aligned": False,
+    }
+    p = tmp_path / "_manifest.lock.json"
+    lock.save(p)
+    loaded = Lockfile.load(p)
+    assert loaded.ai_rag["embedding_aligned"] is False
+    assert loaded.ai_rag["vector_store"] == "weaviate"
