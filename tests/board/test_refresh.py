@@ -173,3 +173,35 @@ def test_refresh_clusters_into_existing_buckets_by_keyword(tmp_path: Path):
     assert "Auth" in result.buckets, f"got {result.buckets}"
     assert "Billing" in result.buckets
     assert "Misc / Untriaged" in result.buckets
+
+
+def test_refresh_with_signals_reuses_caller_data(tmp_path: Path):
+    """When signals={...} provided, helper uses items from there -- skips git walks."""
+    proj_dir = tmp_path / "Projects" / "myproject"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "myproject.md").write_text(
+        "---\nlocal-path: /nonexistent/path\n---\n", encoding="utf-8"
+    )
+    (proj_dir / "board.md").write_text(
+        "---\nlast-refresh: 2026-05-01T00:00:00\n---\n", encoding="utf-8"
+    )
+
+    # Architect passes pre-collected items.
+    signals = {
+        "git_commits": [
+            {
+                "title": "feat: pre-collected",
+                "kind": "commit",
+                "when": "2026-05-15T00:00:00",
+                "source": "commit deadbeef",
+                "refs": "HEAD -> main",
+            },
+        ],
+        "spec_files": [],
+        "plan_files": [],
+    }
+    result = refresh_board(project_dir=proj_dir, signals=signals, full=False)
+    assert result.status == "ok"
+    assert result.done_count == 1
+    titles = [item["title"] for item in result.new_items]
+    assert "feat: pre-collected" in titles

@@ -189,8 +189,41 @@ def _parse_iso_ts(ts: str) -> float | None:
 
 
 def _new_items_from_signals(signals: dict) -> list[dict]:
-    """Reuse caller-provided signals (architect Phase 7 path). Filled in Task 7."""
-    return []
+    """Reuse caller-provided signals."""
+    items: list[dict] = []
+    for commit in signals.get("git_commits", []):
+        items.append(
+            {
+                "title": commit.get("title", ""),
+                "kind": commit.get("kind", "commit"),
+                "when": commit.get("when", ""),
+                "source": commit.get("source", ""),
+                "refs": commit.get("refs", ""),
+            }
+        )
+    for spec_path in signals.get("spec_files", []):
+        p = Path(spec_path)
+        items.append(
+            {
+                "title": p.stem,
+                "kind": "spec",
+                "when": "",
+                "source": str(p),
+                "refs": "",
+            }
+        )
+    for plan_path in signals.get("plan_files", []):
+        p = Path(plan_path)
+        items.append(
+            {
+                "title": p.stem,
+                "kind": "plan",
+                "when": "",
+                "source": str(p),
+                "refs": "",
+            }
+        )
+    return items
 
 
 def _classify_items(items: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
