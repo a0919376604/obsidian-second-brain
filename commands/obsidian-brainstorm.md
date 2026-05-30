@@ -1,35 +1,49 @@
 ---
 description: Interview-style brainstorm: Claude reads vault, opens with 4-6 bold next-direction provocations, drills via follow-ups, distills into a session file feeding /obsidian-roadmap
-argument-hint: <repo>
+argument-hint: <repo> [<topic>]
 category: thinking
 triggers_en: ["brainstorm project", "obsidian brainstorm", "what should I work on", "stuck on next step"]
 param-autocomplete:
   - name: repo
     source: vault-projects
+  - name: topic
+    source: freetext
 ---
 
 Use the obsidian-second-brain skill. Execute `/obsidian-brainstorm $ARGUMENTS`:
 
-The first argument is `<repo>` (project name or absolute path bound by hub `local-path`). Optional flags:
-- `--topic="<seed>"`: narrow the provocation focus (e.g. `--topic="客戶流失"`)
+The first positional argument is `<repo>` (project name or absolute path bound by hub `local-path`). All subsequent non-flag tokens are joined as the optional `<topic>` seed (mirrors `/obsidian-research` / `/obsidian-research-deep` UX). When `<topic>` is provided, Claude focuses provocations on that seed. When `<topic>` is empty, Claude does a whole-vault gap scan and auto-generates 4-6 provocations across `gap` / `persona` / `trend` / `premortem` lenses (the default behavior).
+
+Optional flags:
 - `--lens=gap|persona|trend|premortem|mix`: provocation flavor; default `mix` (1-2 each, 4-6 total)
 - `--depth=quick|medium|deep`: `quick` = open + react only; `medium` = drill 1-2 (default); `deep` = drill all
 - `--lang=zh-TW|en`: override vault `_CLAUDE.md output-lang`
 - `--research-window-days=N`: read Research/ window, default 30
+- `--topic="<seed>"`: **(deprecated, prefer positional `<topic>`)** — still accepted for backward compatibility. If both positional and flag are given, positional wins.
 
-## Phase 0: Pre-flight + resolve <repo>
+## Phase 0: Pre-flight + resolve <repo> + <topic>
 
 - Confirm vault root has `_CLAUDE.md`. If no, abort with "Run /obsidian-init first."
-- Parse the first whitespace-delimited token from `$ARGUMENTS` as the `<repo>` argument. Anything after is treated as flags.
+- Parse `$ARGUMENTS`: first token = `<repo>`, subsequent non-flag tokens joined = `<topic>`, `--flag` tokens kept separate.
 - Resolve via shared helper:
 
 ```python
 import shlex
 tokens = shlex.split(args, posix=True)
 if not tokens:
-    abort("missing <repo> argument. Usage: /obsidian-brainstorm <repo> [--topic=...] [--lens=...] [--depth=...]")
+    abort("missing <repo> argument. Usage: /obsidian-brainstorm <repo> [<topic>] [--lens=...] [--depth=...]")
 repo_token = tokens[0]
-remaining_flags = tokens[1:]
+rest = tokens[1:]
+
+# Split rest into positional topic words vs --flag tokens
+topic_words = [t for t in rest if not t.startswith('--')]
+flag_tokens = [t for t in rest if t.startswith('--')]
+topic = " ".join(topic_words).strip()
+
+# Backward-compat: --topic="..." flag is honored only when positional topic is empty
+for f in flag_tokens:
+    if f.startswith('--topic=') and not topic:
+        topic = f.split('=', 1)[1].strip('"').strip("'")
 
 from scripts.commands.repo_resolver import resolve_repo_arg
 resolution = resolve_repo_arg(
@@ -46,6 +60,8 @@ elif resolution.state == "ambiguous":
 elif resolution.state == "unknown" or resolution.state == "global":
     abort(resolution.message)  # 'global' is rejected for brainstorm
 ```
+
+`topic` is now an empty string OR the user-supplied seed. Phase 2 below uses it: empty → auto-gap-scan default, non-empty → focused provocations.
 
 - Confirm `Projects/<project_slug>/` exists. If no, abort with "Run /obsidian-project <P> first."
 - Ensure `Projects/<project_slug>/Brainstorms/` exists (mkdir if needed).
@@ -72,7 +88,7 @@ If any of the Architecture/* files is missing, log a warning (e.g. "no Architect
 
 ## Phase 2: Opening provocations (LLM, single message)
 
-Using `BrainstormContext` + `--lens` recipe + `--topic` seed (if provided), produce **4-6 provocations** in a single chat message. Each provocation MUST include:
+Using `BrainstormContext` + `--lens` recipe + `<topic>` seed (positional or `--topic=` flag, if either provided; empty string means whole-vault gap scan), produce **4-6 provocations** in a single chat message. Each provocation MUST include:
 
 - **Title** (<=30 chars)
 - **為什麼 / Why** (1-2 sentences)

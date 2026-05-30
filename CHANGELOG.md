@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (brainstorm topic as positional argument)
+
+- `/obsidian-brainstorm` argument schema upgraded from `<repo>` to
+  `<repo> [<topic>]`, aligning with `/obsidian-research` and
+  `/obsidian-research-deep` UX. Topic is **optional positional**: when
+  provided, Claude focuses provocations on that seed; when empty, Claude
+  runs the whole-vault gap scan (existing default behavior — unchanged).
+  Phase 0 parsing now splits `$ARGUMENTS` into `repo = tokens[0]`, then
+  joins subsequent non-flag tokens as `<topic>`, with `--flag` tokens
+  kept separate.
+- The legacy `--topic="<seed>"` flag is **deprecated but still accepted**
+  for backward compatibility. Positional `<topic>` wins when both are
+  supplied; if positional is empty, the flag value is used.
+- Updated `argument-hint`, `param-autocomplete` (added `topic` entry),
+  SKILL.md (both English table + zh-TW description), and README.md
+  command table. Adapters rebuilt for 4 platforms.
+
 ### Changed (architect + board merge)
 
 - `/obsidian-architect <repo>` now auto-refreshes `Projects/<P>/board.md`
