@@ -343,7 +343,7 @@ These slash commands can be used in any Claude surface. Each one is smart — it
 | Command | What it does |
 |---|---|
 | `/obsidian-architect <repo>` | Scan codebase + generate v4 architecture report + AI flows + features lens + memory/RAG cross-flow (v4.3 family) + v4.6 AI companion archetype (v4.5: also auto-refreshes Projects/<P>/board.md as Phase 7, opt-out via --no-board-refresh) |
-| `/obsidian-brainstorm <repo> [<topic>]` | Interview-style brainstorm — 4-6 provocations, drill via follow-ups, distill into Brainstorms/ session file. Optional `<topic>` seed focuses provocations; empty topic runs whole-vault gap scan (default) |
+| `/obsidian-brainstorm <repo> [<topic>]` | Iterative Q&A brainstorm — vault scan + one question at a time (multi-choice preferred) + lazy code-fetch + propose 2-3 approaches with trade-off matrix + 9-section design walk + dual output (engineering spec to `<repo>/docs/superpowers/specs/`, vault note to `Projects/<P>/Brainstorms/`). Optional `<topic>` seed; empty topic triggers Phase 2 multi-choice gap-scan discovery |
 | `/obsidian-roadmap <repo>` | Synthesize Architecture + Research + Brainstorms signals into Roadmap.md + T-NNN tasks |
 | `/obsidian-research <repo> <topic>` | Free-source web + academic research (use `global` as `<repo>` for vault-wide) |
 | `/obsidian-research-deep <repo> <topic>` | Vault-first deep research with gap analysis + multi-sub-query fetch + propagation |
@@ -699,7 +699,8 @@ These commands use the vault as a thinking partner — not just storage. They su
   cards. Three layers: architecture (descriptive) → roadmap (prescriptive)
   → tasks (atomic). Idempotent via `_roadmap.lock.json`; supports vault-wide
   zh-TW via `_CLAUDE.md output-lang`.
-- `/obsidian-brainstorm <repo> [<topic>]` - 卡住、不知道下一步該做什麼時,interview-style brainstorm。Claude 讀整個 vault(Architecture/* + features + ai-flows + personas + decisions + Research + board + 最近 Logs + 過去 brainstorms)後,丟出 4-6 個大膽的下個方向(混 gap / persona / trend / premortem lens),使用者反應後深挖,蒸餾成 ImprovementItem + 待驗證假設,寫進 `Projects/<P>/Brainstorms/YYYY-MM-DD-<slug>.md`,自動被 `/obsidian-roadmap` 撿走。**`<topic>` 是 optional positional**(對齊 `/obsidian-research(-deep)` 語法):有給 topic 就 focus 在該議題,空 topic 走 whole-vault gap scan(default)。Flags: `--lens` / `--depth=quick|medium|deep` / `--research-window-days` / `--lang` /(deprecated)`--topic="..."`(positional 優先,若 positional 空才 fallback 到 flag)。
+- `/obsidian-brainstorm <repo> [<topic>]` - 卡住、不知道下一步該做什麼時,**iterative Q&A brainstorm**(模仿 `superpowers:brainstorming`)。Phase 1 vault scan(`Projects/<P>` + `Decisions/ADR-*` + `Inbox/30d` + `Logs/7d`),Phase 2 topic discovery(只在 `<topic>` 空時跑,Q1 multi-choice ≥4 + Other),Phase 3 iterative Q&A 一次一問(multi-choice 為主)+ lazy code-fetch + 6-item convergence checklist(5/6 門檻),Phase 4 提 2-3 個 approach + trade-off matrix + 強制 (Recommended),Phase 5 9-section design walk(逐節 approval),Phase 6 inline self-review + **dual output**(engineering spec → `<repo>/docs/superpowers/specs/<date>-<slug>-design.md`,vault note → `Projects/<P>/Brainstorms/<date>-<slug>.md`,雙向 cross-link),Phase 7 opt-in handoff 到 `superpowers:writing-plans`。Positional `<topic>` 為主,`--topic="..."` deprecated 但 backward-compat 保留。詳見 `references/brainstorm-question-templates.md`(Phase 3 問題模板)與 `references/ai-first-rules.md`(vault note 格式)。
+  V2 keeps the iterative Q&A brainstorm, 9-section design walk, and dual output contract visible for adapter routing.
 
 ---
 
