@@ -287,7 +287,7 @@ Free transcript via youtube-transcript-api. Metadata scraped from the page (no Y
 | Command | What it does |
 |---|---|
 | `/obsidian-challenge` | Your vault argues against your idea using your own history |
-| `/obsidian-brainstorm <repo> [<topic>]` | 卡住、不知道下一步該做什麼時,Claude 訪談式 brainstorm,丟 4-6 個大膽方向,使用者反應後深挖,蒸餾成 roadmap 候選。Optional `<topic>` seed focus 在指定議題;空 topic 走 whole-vault gap scan(default) |
+| `/obsidian-brainstorm <repo> [<topic>]` | Iterative Q&A brainstorm(模仿 `superpowers:brainstorming`):vault scan + 一次一問 + lazy code-fetch + 2-3 個 approach + trade-off matrix + 9-section 逐節 design + dual output(engineering spec + vault note,雙向 cross-link)+ opt-in handoff 到 `writing-plans`。Optional `<topic>` seed;空 topic 觸發 Phase 2 multi-choice gap discovery |
 | `/obsidian-emerge` | Surfaces patterns from 30 days of notes you never named |
 | `/obsidian-connect [A] [B]` | Bridges two unrelated domains to spark new ideas |
 | `/obsidian-graduate` | Turns an idea fragment into a full project with tasks |
