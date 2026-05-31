@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (brainstorm v2 — iterative Q&A, dual output, lazy code-fetch)
+
+- `/obsidian-brainstorm` Phase 1-7 flow re-designed to mimic
+  `superpowers:brainstorming`. Replaces the v1 "4-6 opening
+  provocations + drill 1-2" with one-question-at-a-time iterative Q&A,
+  multi-choice preferred, lazy code-fetch (Case A/B/C only), 6-item
+  convergence checklist with 5/6 threshold, 2-3 approach proposal with
+  trade-off matrix and forced `(Recommended)`, 9-section
+  section-by-section design walk with per-section approval, inline
+  self-review.
+- **Dual output:** engineering spec written to
+  `<repo>/docs/superpowers/specs/<date>-<slug>-design.md` (REQ/CON/AC
+  IDs, consumable by `superpowers:writing-plans`); vault note written
+  to `Projects/<P>/Brainstorms/<date>-<slug>.md` (AI-first compliant,
+  with Q&A summary, key turning-point quotes, trade-off matrix). Both
+  files bi-directionally cross-linked via frontmatter
+  (`related_brainstorm:` ↔ `spec_path:`).
+- New reference file `references/brainstorm-question-templates.md` with
+  6 question categories (problem-framing, constraint-surfacing,
+  trade-off-forcing, scope-bounding, existing-decision-link, anti-goal).
+- Phase 7 offers opt-in handoff to `superpowers:writing-plans`;
+  command does NOT auto-chain.
+- Positional `<repo> [<topic>]` argument shape preserved (commit
+  `66791b1`).
+- Spec: `docs/superpowers/specs/2026-06-01-obsidian-brainstorm-v2-design.md`
+- Supersedes the v1 design at
+  `docs/superpowers/specs/2026-05-29-obsidian-brainstorm-design.md`.
+
 ### Changed (brainstorm topic as positional argument)
 
 - `/obsidian-brainstorm` argument schema upgraded from `<repo>` to
